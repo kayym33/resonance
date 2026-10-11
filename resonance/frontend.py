@@ -26,7 +26,7 @@ from .backend import (
     get_time,
     next_song,
     previous_song,
-    set_volume,
+    seek_playback,
     toggle_playback,
 )
 
@@ -36,9 +36,9 @@ GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )
 APP_SIZES: dict[str, tuple[str, float]] = {
-    "Small": ("240x352", 0.8),
-    "Default": ("300x440", 1.0),
-    "Large": ("375x550", 1.25),
+    "Small": ("240x336", 0.8),
+    "Default": ("300x420", 1.0),
+    "Large": ("375x525", 1.25),
 }
 
 
@@ -81,8 +81,7 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art: customtkinter.CTkImage | None = None
         self.progress_ms: int = 0
         self.duration_ms: int = 0
-        self.volume_percent: int = 0
-        self.volume_update_active: bool = False
+        self.seek_after_id: str | None = None
         self.is_playing: bool = False
         self.progress_updated_at: float = time.monotonic()
         self.always_on_top: bool = True
@@ -215,14 +214,21 @@ class ResonanceApp(customtkinter.CTk):
         )
         self.progress_frame.pack(fill="x", pady=(10, 0))
 
-        self.progress_bar: customtkinter.CTkProgressBar = (
-            customtkinter.CTkProgressBar(
-                self.progress_frame,
-                height=5,
-                corner_radius=2,
-                progress_color="#E05A7A",
-                fg_color="#F0B1C0",
-            )
+        self.progress_bar: customtkinter.CTkSlider = customtkinter.CTkSlider(
+            self.progress_frame,
+            from_=0,
+            to=1,
+            number_of_steps=1000,
+            height=12,
+            corner_radius=6,
+            border_width=0,
+            button_length=12,
+            button_corner_radius=6,
+            progress_color="#E05A7A",
+            fg_color="#F0B1C0",
+            button_color="#D8758F",
+            button_hover_color="#C96B86",
+            command=self.change_playback_position,
         )
         self.progress_bar.set(0)
         self.progress_bar.pack(fill="x")
@@ -235,38 +241,6 @@ class ResonanceApp(customtkinter.CTk):
             anchor="e",
         )
         self.progress_label.pack(fill="x", pady=(2, 0))
-
-        self.volume_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
-            self.track_text_frame,
-            fg_color="transparent",
-        )
-        self.volume_frame.pack(fill="x", pady=(8, 0))
-
-        self.volume_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
-            self.volume_frame,
-            text="Volume",
-            font=customtkinter.CTkFont(family="Arial", size=10),
-            text_color="#9A5B6D",
-            anchor="w",
-        )
-        self.volume_label.pack(side="left", padx=(0, 8))
-
-        self.volume_slider: customtkinter.CTkSlider = customtkinter.CTkSlider(
-            self.volume_frame,
-            from_=0,
-            to=100,
-            number_of_steps=100,
-            height=12,
-            corner_radius=6,
-            border_width=0,
-            button_length=12,
-            progress_color="#E05A7A",
-            button_color="#D8758F",
-            button_hover_color="#C96B86",
-            command=self.change_volume,
-        )
-        self.volume_slider.set(0)
-        self.volume_slider.pack(side="left", fill="x", expand=True)
 
         self.controls_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self,
@@ -405,33 +379,6 @@ class ResonanceApp(customtkinter.CTk):
 
     def refresh_song(self) -> None:
         self.update_song()
-
-    def change_volume(self, value: float) -> None:
-        if self.volume_update_active:
-            return
-
-        volume_percent = round(value)
-        if volume_percent == self.volume_percent:
-            return
-
-        self.volume_percent = volume_percent
-        self.volume_update_active = True
-        future: Future[None] = self.worker.submit(
-            set_volume,
-            volume_percent,
-        )
-        future.add_done_callback(self.volume_update_finished)
-
-    def volume_update_finished(self, future: Future[None]) -> None:
-        self.after(0, self.apply_volume_update, future)
-
-    def apply_volume_update(self, future: Future[None]) -> None:
-        self.volume_update_active = False
-        try:
-            future.result()
-        except Exception:
-            self.volume_label.configure(text="Volume unavailable")
-            self.after(2000, lambda: self.volume_label.configure(text="Volume"))
 
     @staticmethod
     def parse_version(version: str) -> tuple[int, ...]:
@@ -602,11 +549,6 @@ class ResonanceApp(customtkinter.CTk):
         self.duration_ms = duration_ms
         self.is_playing = song["is_playing"]
         self.progress_updated_at = time.monotonic()
-        volume_percent = song["volume_percent"]
-        if isinstance(volume_percent, (int, float)):
-            self.volume_percent = int(volume_percent)
-            self.volume_slider.set(self.volume_percent)
-
         if song["album_art_url"] != self.album_art_url:
             self.load_album_art(song["album_art_url"])
 
@@ -630,6 +572,21 @@ class ResonanceApp(customtkinter.CTk):
             f"{self.format_time(self.duration_ms)}"
         )
         self.after(REFRESH_TIME * 1000, self.update_progress)
+
+    def change_playback_position(self, value: float) -> None:
+        if not self.duration_ms:
+            return
+
+        self.progress_ms = round(value * self.duration_ms)
+        self.progress_updated_at = time.monotonic()
+        if self.seek_after_id is not None:
+            self.after_cancel(self.seek_after_id)
+        self.seek_after_id = self.after(300, self.seek_to_current_position)
+
+    def seek_to_current_position(self) -> None:
+        self.seek_after_id = None
+        position_ms = max(0, min(self.progress_ms, self.duration_ms))
+        self.worker.submit(seek_playback, position_ms)
 
     @staticmethod
     def format_time(milliseconds: int) -> str:
