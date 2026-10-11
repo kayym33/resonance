@@ -33,6 +33,9 @@ from .backend import (
 
 QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
 APP_VERSION = "0.1.2"
+APP_AUTHOR = "Kayla"
+APP_EMAIL = "kayym33@users.noreply.github.com"
+APP_REPOSITORY = "https://github.com/kayym33/resonance"
 GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )
@@ -123,6 +126,10 @@ class ResonanceApp(customtkinter.CTk):
         self.context_menu.add_command(
             label="Check for updates",
             command=self.check_for_updates,
+        )
+        self.context_menu.add_command(
+            label="About Resonance",
+            command=self.show_about,
         )
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Exit", command=self.close_app)
@@ -402,6 +409,17 @@ class ResonanceApp(customtkinter.CTk):
         if not webbrowser.open("spotify:"):
             webbrowser.open("https://open.spotify.com/")
 
+    def show_about(self) -> None:
+        messagebox.showinfo(
+            "About Resonance",
+            f"Resonance {APP_VERSION}\n\n"
+            f"Author: {APP_AUTHOR}\n"
+            f"Email: {APP_EMAIL}\n"
+            f"Repository: {APP_REPOSITORY}\n"
+            f"Platform: {sys.platform}",
+            parent=self,
+        )
+
     def toggle_always_on_top(self) -> None:
         self.always_on_top = self.always_on_top_var.get()
         self.attributes("-topmost", self.always_on_top)
@@ -602,9 +620,20 @@ class ResonanceApp(customtkinter.CTk):
             updater_path = Path(tempfile.gettempdir()) / "Resonance-updater.bat"
             updater_path.write_text(
                 "@echo off\r\n"
-                "timeout /t 2 /nobreak >nul\r\n"
+                "set attempts=0\r\n"
+                ":wait_for_exit\r\n"
+                "timeout /t 1 /nobreak >nul\r\n"
                 f'copy /y "{download_path}" "{current_exe}" >nul\r\n'
-                f'start "" "{current_exe}"\r\n'
+                "if not errorlevel 1 goto start_app\r\n"
+                "set /a attempts+=1\r\n"
+                "if %attempts% GEQ 30 goto update_failed\r\n"
+                "goto wait_for_exit\r\n"
+                ":start_app\r\n"
+                f'start "" /d "{current_exe.parent}" "{current_exe}"\r\n'
+                "del \"%~f0\"\r\n"
+                "exit /b 0\r\n"
+                ":update_failed\r\n"
+                f'del "{download_path}"\r\n'
                 f'del "%~f0"\r\n',
                 encoding="utf-8",
             )
@@ -771,4 +800,3 @@ def create_app() -> ResonanceApp:
             "resonance.app"
         )
     return ResonanceApp()
-
