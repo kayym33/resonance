@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import os
+import re
+import subprocess
+import sys
+import tempfile
 import time
 import tkinter as tk
 import webbrowser
@@ -10,7 +14,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from io import BytesIO
 from typing import Any
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import customtkinter
 from PIL import Image
@@ -25,6 +29,10 @@ from .backend import (
 )
 
 QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
+APP_VERSION = "0.1.0"
+GITHUB_RELEASES_API = (
+    "https://api.github.com/repos/kayym33/resonance/releases/latest"
+)
 APP_SIZES: dict[str, tuple[str, float]] = {
     "Small": ("240x320", 0.8),
     "Default": ("300x400", 1.0),
@@ -102,6 +110,10 @@ class ResonanceApp(customtkinter.CTk):
         self.context_menu.add_command(
             label="Refresh song",
             command=self.refresh_song,
+        )
+        self.context_menu.add_command(
+            label="Check for updates",
+            command=self.check_for_updates,
         )
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Exit", command=self.close_app)
@@ -357,6 +369,141 @@ class ResonanceApp(customtkinter.CTk):
 
     def refresh_song(self) -> None:
         self.update_song()
+
+    @staticmethod
+    def parse_version(version: str) -> tuple[int, ...]:
+        numbers = re.findall(r"\d+", version.lstrip("v"))
+        return tuple(int(number) for number in numbers) or (0,)
+
+    def check_for_updates(self) -> None:
+        if os.name != "nt" or not getattr(sys, "frozen", False):
+            messagebox.showinfo(
+                "Updates",
+                "Automatic updates are available for the Windows executable "
+                "distributed through GitHub Releases.",
+                parent=self,
+            )
+            return
+
+        self.context_menu.entryconfigure(
+            "Check for updates",
+            state=tk.DISABLED,
+        )
+        self.worker.submit(self.find_update).add_done_callback(
+            self.update_check_finished
+        )
+
+    @staticmethod
+    def find_update() -> tuple[str, str] | None:
+        request = Request(
+            GITHUB_RELEASES_API,
+            headers={"Accept": "application/vnd.github+json"},
+        )
+        with urlopen(request, timeout=10) as response:
+            release: Any = json.load(response)
+
+        if not isinstance(release, dict):
+            raise ValueError("GitHub returned an invalid release response")
+
+        tag_name = release.get("tag_name")
+        assets = release.get("assets")
+        if not isinstance(tag_name, str) or not isinstance(assets, list):
+            raise ValueError("GitHub release is missing version or assets")
+
+        for asset in assets:
+            if (
+                isinstance(asset, dict)
+                and asset.get("name") == "Resonance.exe"
+                and isinstance(asset.get("browser_download_url"), str)
+            ):
+                return tag_name, asset["browser_download_url"]
+        raise ValueError("The latest release does not contain Resonance.exe")
+
+    def update_check_finished(
+        self,
+        future: Future[tuple[str, str] | None],
+    ) -> None:
+        self.after(0, self.apply_update_check, future)
+
+    def apply_update_check(
+        self,
+        future: Future[tuple[str, str] | None],
+    ) -> None:
+        self.context_menu.entryconfigure(
+            "Check for updates",
+            state=tk.NORMAL,
+        )
+        try:
+            update = future.result()
+        except Exception as error:
+            messagebox.showerror(
+                "Update check failed",
+                f"Could not check GitHub Releases:\n{error}",
+                parent=self,
+            )
+            return
+
+        if update is None or self.parse_version(update[0]) <= self.parse_version(
+            APP_VERSION
+        ):
+            messagebox.showinfo(
+                "Updates",
+                f"Resonance {APP_VERSION} is up to date.",
+                parent=self,
+            )
+            return
+
+        tag_name, download_url = update
+        if messagebox.askyesno(
+            "Update available",
+            f"Resonance {tag_name} is available. Download and install it now?",
+            parent=self,
+        ):
+            self.worker.submit(
+                self.download_update,
+                download_url,
+            ).add_done_callback(self.update_download_finished)
+
+    @staticmethod
+    def download_update(download_url: str) -> Path:
+        download_path = Path(tempfile.gettempdir()) / "Resonance-update.exe"
+        request = Request(
+            download_url,
+            headers={"Accept": "application/octet-stream"},
+        )
+        with urlopen(request, timeout=60) as response, download_path.open("wb") as output:
+            while chunk := response.read(1024 * 1024):
+                output.write(chunk)
+        return download_path
+
+    def update_download_finished(self, future: Future[Path]) -> None:
+        self.after(0, self.apply_downloaded_update, future)
+
+    def apply_downloaded_update(self, future: Future[Path]) -> None:
+        try:
+            download_path = future.result()
+            current_exe = Path(sys.executable).resolve()
+            updater_path = Path(tempfile.gettempdir()) / "Resonance-updater.bat"
+            updater_path.write_text(
+                "@echo off\r\n"
+                "timeout /t 2 /nobreak >nul\r\n"
+                f'copy /y "{download_path}" "{current_exe}" >nul\r\n'
+                f'start "" "{current_exe}"\r\n'
+                f'del "%~f0"\r\n',
+                encoding="utf-8",
+            )
+            subprocess.Popen(
+                ["cmd", "/c", str(updater_path)],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        except Exception as error:
+            messagebox.showerror(
+                "Update failed",
+                f"Could not install the update:\n{error}",
+                parent=self,
+            )
+            return
+        self.close_app()
 
     def update_song(self) -> None:
         if self.song_request_active:

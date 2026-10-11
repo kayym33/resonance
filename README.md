@@ -78,6 +78,29 @@ python main.py
 
 The Windows `.exe` is not required on Linux; run the Python version instead.
 
+## Update the Windows app
+
+Windows executable updates are published through GitHub Releases. A normal
+code push does not replace an already-installed executable.
+
+To publish an update:
+
+1. Change `APP_VERSION` in `resonance/frontend.py`.
+2. Commit and push the change.
+3. Create and push a version tag, for example:
+
+   ```powershell
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+4. GitHub Actions builds `Resonance.exe` and attaches it to the new release.
+
+Users can then right-click the Windows app and choose **Check for updates**.
+After they confirm, Resonance downloads the new executable, closes, replaces
+it, and starts the updated version. Updates are downloaded only after the user
+confirms the prompt.
+
 ## Connect your Spotify account
 
 The first time Resonance starts, it asks for:
