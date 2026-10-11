@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 import os
-import re
-import subprocess
 import sys
-import tempfile
 import time
 import tkinter as tk
 import webbrowser
 import ctypes
-import json
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from io import BytesIO
 from tkinter import messagebox
 from typing import Any
-from urllib.request import Request, urlopen
 
 import customtkinter
 from PIL import Image
@@ -30,32 +25,15 @@ from .backend import (
     set_volume,
     toggle_playback,
 )
-
-QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
-APP_VERSION = "0.1.2"
-GITHUB_RELEASES_API = (
-    "https://api.github.com/repos/kayym33/resonance/releases/latest"
+from .constants import (
+    APP_AUTHOR,
+    APP_EMAIL,
+    APP_REPOSITORY,
+    APP_SIZES,
+    APP_VERSION,
+    QUOTES,
 )
-APP_SIZES: dict[str, tuple[str, float]] = {
-    "Small": ("260x350", 1.0),
-    "Medium": ("320x450", 1.0),
-    "Large": ("375x500", 1.25),
-}
-
-
-def load_quotes() -> tuple[str, ...]:
-    with QUOTES_PATH.open(encoding="utf-8") as quotes_file:
-        quotes: Any = json.load(quotes_file)
-
-    if not isinstance(quotes, list) or not all(
-        isinstance(quote, str) for quote in quotes
-    ):
-        raise ValueError("assets/quotes.json must contain a list of strings")
-
-    return tuple(quotes)
-
-
-QUOTES: tuple[str, ...] = load_quotes()
+from . import updater
 
 
 class ResonanceApp(customtkinter.CTk):
@@ -123,6 +101,10 @@ class ResonanceApp(customtkinter.CTk):
         self.context_menu.add_command(
             label="Check for updates",
             command=self.check_for_updates,
+        )
+        self.context_menu.add_command(
+            label="About Resonance",
+            command=self.show_about,
         )
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Exit", command=self.close_app)
@@ -402,6 +384,17 @@ class ResonanceApp(customtkinter.CTk):
         if not webbrowser.open("spotify:"):
             webbrowser.open("https://open.spotify.com/")
 
+    def show_about(self) -> None:
+        messagebox.showinfo(
+            "About Resonance",
+            f"Resonance {APP_VERSION}\n\n"
+            f"Author: {APP_AUTHOR}\n"
+            f"Email: {APP_EMAIL}\n"
+            f"Repository: {APP_REPOSITORY}\n"
+            f"Platform: {sys.platform}",
+            parent=self,
+        )
+
     def toggle_always_on_top(self) -> None:
         self.always_on_top = self.always_on_top_var.get()
         self.attributes("-topmost", self.always_on_top)
@@ -488,8 +481,15 @@ class ResonanceApp(customtkinter.CTk):
 
     @staticmethod
     def parse_version(version: str) -> tuple[int, ...]:
-        numbers = re.findall(r"\d+", version.lstrip("v"))
-        return tuple(int(number) for number in numbers) or (0,)
+        return updater.parse_version(version)
+
+    @staticmethod
+    def find_update() -> tuple[str, str] | None:
+        return updater.find_update()
+
+    @staticmethod
+    def download_update(download_url: str) -> Path:
+        return updater.download_update(download_url)
 
     def check_for_updates(self) -> None:
         if os.name != "nt" or not getattr(sys, "frozen", False):
@@ -508,32 +508,6 @@ class ResonanceApp(customtkinter.CTk):
         self.worker.submit(self.find_update).add_done_callback(
             self.update_check_finished
         )
-
-    @staticmethod
-    def find_update() -> tuple[str, str] | None:
-        request = Request(
-            GITHUB_RELEASES_API,
-            headers={"Accept": "application/vnd.github+json"},
-        )
-        with urlopen(request, timeout=10) as response:
-            release: Any = json.load(response)
-
-        if not isinstance(release, dict):
-            raise ValueError("GitHub returned an invalid release response")
-
-        tag_name = release.get("tag_name")
-        assets = release.get("assets")
-        if not isinstance(tag_name, str) or not isinstance(assets, list):
-            raise ValueError("GitHub release is missing version or assets")
-
-        for asset in assets:
-            if (
-                isinstance(asset, dict)
-                and asset.get("name") == "Resonance.exe"
-                and isinstance(asset.get("browser_download_url"), str)
-            ):
-                return tag_name, asset["browser_download_url"]
-        raise ValueError("The latest release does not contain Resonance.exe")
 
     def update_check_finished(
         self,
@@ -580,38 +554,13 @@ class ResonanceApp(customtkinter.CTk):
                 download_url,
             ).add_done_callback(self.update_download_finished)
 
-    @staticmethod
-    def download_update(download_url: str) -> Path:
-        download_path = Path(tempfile.gettempdir()) / "Resonance-update.exe"
-        request = Request(
-            download_url,
-            headers={"Accept": "application/octet-stream"},
-        )
-        with urlopen(request, timeout=60) as response, download_path.open("wb") as output:
-            while chunk := response.read(1024 * 1024):
-                output.write(chunk)
-        return download_path
-
     def update_download_finished(self, future: Future[Path]) -> None:
         self.after(0, self.apply_downloaded_update, future)
 
     def apply_downloaded_update(self, future: Future[Path]) -> None:
         try:
             download_path = future.result()
-            current_exe = Path(sys.executable).resolve()
-            updater_path = Path(tempfile.gettempdir()) / "Resonance-updater.bat"
-            updater_path.write_text(
-                "@echo off\r\n"
-                "timeout /t 2 /nobreak >nul\r\n"
-                f'copy /y "{download_path}" "{current_exe}" >nul\r\n'
-                f'start "" "{current_exe}"\r\n'
-                f'del "%~f0"\r\n',
-                encoding="utf-8",
-            )
-            subprocess.Popen(
-                ["cmd", "/c", str(updater_path)],
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
+            updater.install_update(download_path)
         except Exception as error:
             messagebox.showerror(
                 "Update failed",
@@ -771,4 +720,3 @@ def create_app() -> ResonanceApp:
             "resonance.app"
         )
     return ResonanceApp()
-
