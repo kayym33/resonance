@@ -87,13 +87,25 @@ request is merged into `main`, GitHub Actions automatically:
 
 1. Increments the patch version, such as `0.1.1` to `0.1.2`.
 2. Commits the new `APP_VERSION` back to `main`.
-3. Builds `Resonance.exe` on a Windows runner.
+3. Builds `Resonance.exe` on a Windows runner and `Resonance-linux` on an
+   Ubuntu runner.
 4. Creates a matching GitHub Release, such as `v0.1.2`.
 
 Users can then right-click the Windows app and choose **Check for updates**.
 After they confirm, Resonance downloads the new executable, closes, replaces
 it, and starts the updated version. Updates are downloaded only after the user
 confirms the prompt.
+
+On Ubuntu, download `Resonance-linux` from the release, make it executable,
+and run it from a terminal:
+
+```bash
+chmod +x Resonance-linux
+./Resonance-linux
+```
+
+The Linux executable is intended for typical x86_64 Ubuntu systems. The
+Python version remains available for other Linux architectures or distributions.
 
 ## Connect your Spotify account
 
