@@ -9,6 +9,7 @@ controls without opening the full Spotify window.
 - See the current song, artist, album artwork, progress, and duration.
 - Play or pause the current track.
 - Skip to the previous or next track.
+- Adjust the Spotify device volume with the volume slider.
 - Keep the player window on top of other windows.
 - Open Spotify, refresh the current track, or exit from the right-click menu.
 - Display rotating quotes beneath the playback time.
@@ -126,6 +127,7 @@ use must be added as a test user in the application's dashboard.
 | Previous track | Select `⏮` |
 | Play or pause | Select `▶` or `⏸` |
 | Next track | Select `⏭` |
+| Volume | Drag the volume slider |
 | More options | Right-click anywhere in the window |
 | Close Resonance | Use the window close button, **Exit**, `Ctrl+Q`, or `Escape` |
 
