@@ -127,11 +127,15 @@ use must be added as a test user in the application's dashboard.
 | Play or pause | Select `▶` or `⏸` |
 | Next track | Select `⏭` |
 | More options | Right-click anywhere in the window |
+| Change size | Right-click, then choose **Size** and select **Small**, **Medium**, or **Large** |
 | Close Resonance | Use the window close button, **Exit**, `Ctrl+Q`, or `Escape` |
 
 Playback controls work only when Spotify Premium is active and Spotify has an
 available playback device. Open Spotify, select a device, and try again if
 the controls do not respond.
+
+In **Small** mode, move the pointer over the bottom 20% of the window to
+reveal the playback buttons.
 
 ## Your credentials and privacy
 

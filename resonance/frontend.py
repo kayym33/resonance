@@ -34,8 +34,8 @@ GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )
 APP_SIZES: dict[str, tuple[str, float]] = {
-    "Small": ("240x320", 0.8),
-    "Default": ("300x400", 1.0),
+    "Small": ("260x350", 0.9),
+    "Medium": ("300x400", 1.0),
     "Large": ("375x500", 1.25),
 }
 
@@ -58,14 +58,17 @@ QUOTES: tuple[str, ...] = load_quotes()
 class ResonanceApp(customtkinter.CTk):
     def __init__(self) -> None:
         super().__init__()
-        self.size_var: tk.StringVar = tk.StringVar(value="Default")
-        self.geometry(APP_SIZES["Default"][0])
+        self.size_var: tk.StringVar = tk.StringVar(value="Medium")
+        self.current_size_name: str = "Medium"
+        self.controls_visible: bool = True
+        self.geometry(APP_SIZES["Medium"][0])
         self.resizable(False, False)
         self.title("Resonance")
         self.attributes("-topmost", True)
         self.configure(fg_color="#FFF1F5")
         self.bind("<Map>", self.restore_topmost)
         self.bind_all("<Button-3>", self.show_context_menu)
+        self.bind_all("<Motion>", self.handle_pointer_motion)
         self.bind_all("<Control-q>", self.close_app)
         self.bind_all("<Escape>", self.close_app)
         if os.name == "nt":
@@ -141,6 +144,7 @@ class ResonanceApp(customtkinter.CTk):
             ),
             text_color="#9A5B6D",
             anchor="center",
+            wraplength=260,
         )
         self.user_label.pack(fill="x", pady=(0, 8))
 
@@ -363,9 +367,52 @@ class ResonanceApp(customtkinter.CTk):
             raise ValueError(f"Unknown app size: {size_name}")
 
         geometry, scaling = size
+        self.current_size_name = size_name
         customtkinter.set_widget_scaling(scaling)
         customtkinter.set_window_scaling(scaling)
         self.geometry(geometry)
+        width = int(geometry.split("x", maxsplit=1)[0])
+        self.user_label.configure(wraplength=max(180, width - 40))
+        if size_name == "Small":
+            self.hide_controls()
+        else:
+            self.show_controls()
+
+    def handle_pointer_motion(self, event: tk.Event[tk.Misc]) -> None:
+        if self.current_size_name != "Small":
+            return
+
+        pointer_y = event.y_root - self.winfo_rooty()
+        if pointer_y >= self.winfo_height() * 0.8:
+            self.show_controls()
+        elif self.controls_visible and pointer_y < self.winfo_height() * 0.7:
+            self.hide_controls()
+
+    def hide_controls(self) -> None:
+        if not self.controls_visible:
+            return
+        if self.current_size_name == "Small":
+            self.controls_frame.pack_forget()
+            self.controls_frame.place_forget()
+        else:
+            self.controls_frame.pack_forget()
+        self.controls_visible = False
+
+    def show_controls(self) -> None:
+        if self.controls_visible:
+            return
+        if self.current_size_name == "Small":
+            self.controls_frame.place(
+                relx=0,
+                rely=1.0,
+                anchor="sw",
+                relwidth=1.0,
+                x=0,
+                y=-4,
+            )
+        else:
+            self.controls_frame.pack(fill="x", padx=16, pady=(0, 14))
+        self.controls_visible = True
 
     def refresh_song(self) -> None:
         self.update_song()
