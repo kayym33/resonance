@@ -15,7 +15,7 @@ controls without opening the full Spotify window.
 
 ## Requirements
 
-- Windows
+- Windows or Linux
 - A Spotify account
 - Spotify installed and signed in on at least one device
 - Spotify Premium for playback controls
@@ -43,11 +43,11 @@ Before opening Resonance, create a Spotify developer application:
 
 ### Using the Windows executable
 
-Double-click `Resonance.exe`. If Windows displays a security warning, verify
-that the file came from the person or location you trust before choosing
-**Run**.
+The included `Resonance.exe` is for Windows. Double-click it to start the
+application. If Windows displays a security warning, verify that the file came
+from the person or location you trust before choosing **Run**.
 
-### Using the Python version
+### Using the Python version on Windows
 
 If you received the source-code version instead of the executable, install
 Python 3.10 or newer, open PowerShell in the Resonance folder, and run:
@@ -56,6 +56,27 @@ Python 3.10 or newer, open PowerShell in the Resonance folder, and run:
 py -m pip install spotipy customtkinter pillow
 py main.py
 ```
+
+### Using the Python version on Linux
+
+Install Python, Tkinter, and virtual-environment support. On Ubuntu or Debian,
+run:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv python3-tk
+```
+
+Then, from the Resonance folder, create an environment and start the app:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install spotipy customtkinter pillow
+python main.py
+```
+
+The Windows `.exe` is not required on Linux; run the Python version instead.
 
 ## Connect your Spotify account
 

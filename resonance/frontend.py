@@ -54,10 +54,11 @@ class ResonanceApp(customtkinter.CTk):
         self.bind_all("<Button-3>", self.show_context_menu)
         self.bind_all("<Control-q>", self.close_app)
         self.bind_all("<Escape>", self.close_app)
-        icon_path: Path = (
-            Path(__file__).resolve().parents[1] / "assets" / "icon.ico"
-        )
-        self.iconbitmap(str(icon_path))
+        if os.name == "nt":
+            icon_path: Path = (
+                Path(__file__).resolve().parents[1] / "assets" / "icon.ico"
+            )
+            self.iconbitmap(str(icon_path))
         self.drag_start_x: int = 0
         self.drag_start_y: int = 0
         self.album_art_url: str | None = None
