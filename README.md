@@ -1,163 +1,147 @@
 # Resonance
 
-Resonance is a small Windows desktop music companion that displays the currently
-playing Spotify track, album artwork, playback progress, and playback controls.
+Resonance is a small Windows desktop companion for Spotify. It shows the
+currently playing track in a compact window and gives you quick playback
+controls without opening the full Spotify window.
 
-## Features
+## What you can do
 
-- Fixed `300x400` music player window
-- Current song, artist, and album artwork
-- Track progress and duration
-- Rotating italic quotes beneath the time
-- Previous, play/pause, and next controls
-- Right-click menu:
-  - Open the Spotify desktop app
-  - Enable or disable always-on-top
-  - Refresh the current song
-  - Exit the app
-- Custom app icon
-
-You can edit or add quotes in `assets\quotes.json`. Quotes rotate every
-30 seconds while the app is running.
-
-## Project structure
-
-```text
-clock/
-├── main.py                 # Application entry point
-├── resonance/              # Python package
-│   ├── backend.py          # Spotify API integration
-│   ├── frontend.py         # CustomTkinter user interface
-│   ├── setup.py            # First-run credential setup
-│   └── __init__.py
-├── assets/
-│   ├── icon.ico            # Application icon
-│   ├── icon-original.jpg   # Original artwork
-│   ├── pink_theme.json     # CustomTkinter theme
-│   └── quotes.json         # Rotating quotes
-└── README.md
-```
+- See the current song, artist, album artwork, progress, and duration.
+- Play or pause the current track.
+- Skip to the previous or next track.
+- Keep the player window on top of other windows.
+- Open Spotify, refresh the current track, or exit from the right-click menu.
+- Display rotating quotes beneath the playback time.
 
 ## Requirements
 
 - Windows
-- Python 3.10 or newer
 - A Spotify account
+- Spotify installed and signed in on at least one device
 - Spotify Premium for playback controls
-- Spotify open on an active device
+- An internet connection
 
-## Spotify setup
+## First-time setup
 
-1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
-2. Create an app and select **Web API**.
-3. In the app settings, add this exact redirect URI:
+Before opening Resonance, create a Spotify developer application:
+
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+   and sign in.
+2. Create an application and choose **Web API** if Spotify asks which
+   product you want to use.
+3. Open the application's settings and add this redirect URI exactly:
 
    ```text
    http://127.0.0.1:8888/callback
    ```
 
-   `localhost` is not accepted by Spotify's current redirect URI rules.
-4. Copy the app's **Client ID** and **Client Secret**.
+   Do not replace `127.0.0.1` with `localhost`.
+4. Copy the application's **Client ID** and **Client Secret**. Keep the
+   secret private.
 
-## Run from source
+## Start Resonance
 
-Open PowerShell in the project folder and install the dependencies:
+### Using the Windows executable
+
+Double-click `Resonance.exe`. If Windows displays a security warning, verify
+that the file came from the person or location you trust before choosing
+**Run**.
+
+### Using the Python version
+
+If you received the source-code version instead of the executable, install
+Python 3.10 or newer, open PowerShell in the Resonance folder, and run:
 
 ```powershell
 py -m pip install spotipy customtkinter pillow
-```
-
-Set the Spotify credentials in the same PowerShell window:
-
-```powershell
-$env:SPOTIPY_CLIENT_ID = "your-client-id"
-$env:SPOTIPY_CLIENT_SECRET = "your-client-secret"
-$env:SPOTIPY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
-```
-
-Start Resonance:
-
-```powershell
 py main.py
 ```
 
-The first run shows a setup window for the Spotify credentials, then opens
-Spotify authorization in a browser. Approve the requested permissions and
-return to the app. Credentials are saved locally in
-`%LOCALAPPDATA%\Resonance\spotify.json`; they are not included in the
-executable. Delete that file to show the setup window again.
+## Connect your Spotify account
+
+The first time Resonance starts, it asks for:
+
+- **Spotify Client ID** — from your Spotify developer application.
+- **Spotify Client Secret** — from the same application.
+- **Redirect URI** — leave this as:
+
+  ```text
+  http://127.0.0.1:8888/callback
+  ```
+
+Choose **Save and continue**, then approve access in the browser window that
+opens. Return to Resonance after authorization.
+
+If your Spotify application is in Development mode, the Spotify account you
+use must be added as a test user in the application's dashboard.
 
 ## Controls
 
-| Action | Control |
+| Action | How to use it |
 | --- | --- |
-| Previous track | `⏮` |
-| Play or pause | `▶` / `⏸` |
-| Next track | `⏭` |
-| Context menu | Right-click |
-| Close | Native close button, context menu **Exit**, `Ctrl+Q`, or `Escape` |
+| Previous track | Select `⏮` |
+| Play or pause | Select `▶` or `⏸` |
+| Next track | Select `⏭` |
+| More options | Right-click anywhere in the window |
+| Close Resonance | Use the window close button, **Exit**, `Ctrl+Q`, or `Escape` |
 
-## Build a Windows executable
+Playback controls work only when Spotify Premium is active and Spotify has an
+available playback device. Open Spotify, select a device, and try again if
+the controls do not respond.
 
-Install PyInstaller:
+## Your credentials and privacy
 
-```powershell
-py -m pip install pyinstaller
-```
-
-Build the executable:
-
-```powershell
-pyinstaller --onefile --windowed --name Resonance `
-  --icon=assets\icon.ico `
-  --add-data "assets\pink_theme.json;assets" `
-  --add-data "assets\icon.ico;assets" `
-  --add-data "assets\quotes.json;assets" `
-  main.py
-```
-
-The executable is created at:
+Resonance stores the Spotify application details locally on your computer at:
 
 ```text
-dist\Resonance.exe
+%LOCALAPPDATA%\Resonance\spotify.json
 ```
 
-Send the executable and this README to another user. They must use their own
-Spotify credentials and authorize the app with their own Spotify account.
+The application uses Spotify authorization to access your playback
+information. It does not include your credentials in the executable.
 
-If the Spotify app is in Development mode, add their Spotify account as a test
-user in the Spotify Developer Dashboard first.
-
-## Security
-
-- Never commit or share `SPOTIPY_CLIENT_SECRET`.
-- Never share the `.cache` file. It contains an authorization token.
-- Each user should authorize the app with their own Spotify account.
+Never share your Spotify Client Secret or authorization cache. If you are
+using a copy of Resonance from someone else, create and use your own Spotify
+developer application.
 
 ## Troubleshooting
 
-### No client ID
+### The setup window keeps appearing
 
-Set the three `SPOTIPY_*` environment variables in the same PowerShell window
-used to start the app.
+Check that the Client ID and Client Secret are correct, then save them again.
+If you are using the Python version, make sure the three `SPOTIPY_*`
+environment variables are set in the same PowerShell window used to start the
+app.
 
-### Authorization or permission errors
+### Authorization fails
 
-Delete the local token cache and authorize again:
+Confirm that the redirect URI in the Spotify Developer Dashboard matches this
+value exactly:
 
-```powershell
-Remove-Item .cache
-py main.py
+```text
+http://127.0.0.1:8888/callback
 ```
 
-Only run this command from the Resonance folder, and only if `.cache` exists.
+Also confirm that your Spotify account is listed as a test user when the
+developer application is in Development mode.
 
 ### Playback controls do not work
 
 Playback controls require Spotify Premium and an active Spotify device. Open
-Spotify on the desktop or phone, select a device, and try again.
+Spotify, select a device, and then try the control again.
 
 ### Album artwork does not load
 
-Check that the computer is connected to the internet. Artwork is downloaded
-from Spotify when the track changes.
+Check your internet connection. Artwork is downloaded from Spotify when the
+track changes.
+
+### Start over with a different Spotify account
+
+Close Resonance and delete this file:
+
+```text
+%LOCALAPPDATA%\Resonance\spotify.json
+```
+
+Start Resonance again and enter the credentials for the Spotify developer
+application you want to use.
