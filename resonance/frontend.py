@@ -13,6 +13,7 @@ import json
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from io import BytesIO
+from tkinter import messagebox
 from typing import Any
 from urllib.request import Request, urlopen
 
@@ -29,7 +30,7 @@ from .backend import (
 )
 
 QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )
