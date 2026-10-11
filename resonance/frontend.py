@@ -662,26 +662,38 @@ class ResonanceApp(customtkinter.CTk):
             self.album_art_label.configure(image=None, text="")
             return
 
-        if self.album_art_request_active:
-            return
-
         self.album_art_request_active = True
         future: Future[Image.Image] = self.worker.submit(
             self.download_album_art,
             image_url,
         )
-        future.add_done_callback(self.album_art_request_finished)
+        future.add_done_callback(
+            lambda completed, requested_url=image_url: (
+                self.album_art_request_finished(completed, requested_url)
+            )
+        )
 
     @staticmethod
     def download_album_art(image_url: str) -> Image.Image:
         with urlopen(image_url, timeout=5) as response:
             return Image.open(BytesIO(response.read())).convert("RGB")
 
-    def album_art_request_finished(self, future: Future[Image.Image]) -> None:
-        self.after(0, self.apply_album_art, future)
+    def album_art_request_finished(
+        self,
+        future: Future[Image.Image],
+        requested_url: str,
+    ) -> None:
+        self.after(0, self.apply_album_art, future, requested_url)
 
-    def apply_album_art(self, future: Future[Image.Image]) -> None:
+    def apply_album_art(
+        self,
+        future: Future[Image.Image],
+        requested_url: str,
+    ) -> None:
         self.album_art_request_active = False
+        if requested_url != self.album_art_url:
+            return
+
         try:
             image: Image.Image = future.result()
         except Exception:
