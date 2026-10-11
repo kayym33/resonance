@@ -25,6 +25,11 @@ from .backend import (
 )
 
 QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
+APP_SIZES: dict[str, tuple[str, float]] = {
+    "Small": ("240x320", 0.8),
+    "Default": ("300x400", 1.0),
+    "Large": ("375x500", 1.25),
+}
 
 
 def load_quotes() -> tuple[str, ...]:
@@ -45,7 +50,8 @@ QUOTES: tuple[str, ...] = load_quotes()
 class ResonanceApp(customtkinter.CTk):
     def __init__(self) -> None:
         super().__init__()
-        self.geometry("300x400")
+        self.size_var: tk.StringVar = tk.StringVar(value="Default")
+        self.geometry(APP_SIZES["Default"][0])
         self.resizable(False, False)
         self.title("Resonance")
         self.attributes("-topmost", True)
@@ -84,6 +90,15 @@ class ResonanceApp(customtkinter.CTk):
             variable=self.always_on_top_var,
             command=self.toggle_always_on_top,
         )
+        self.size_menu: tk.Menu = tk.Menu(self.context_menu, tearoff=False)
+        for size_name in APP_SIZES:
+            self.size_menu.add_radiobutton(
+                label=size_name,
+                variable=self.size_var,
+                value=size_name,
+                command=lambda name=size_name: self.set_app_size(name),
+            )
+        self.context_menu.add_cascade(label="Size", menu=self.size_menu)
         self.context_menu.add_command(
             label="Refresh song",
             command=self.refresh_song,
@@ -329,6 +344,16 @@ class ResonanceApp(customtkinter.CTk):
     def toggle_always_on_top(self) -> None:
         self.always_on_top = self.always_on_top_var.get()
         self.attributes("-topmost", self.always_on_top)
+
+    def set_app_size(self, size_name: str) -> None:
+        size = APP_SIZES.get(size_name)
+        if size is None:
+            raise ValueError(f"Unknown app size: {size_name}")
+
+        geometry, scaling = size
+        customtkinter.set_widget_scaling(scaling)
+        customtkinter.set_window_scaling(scaling)
+        self.geometry(geometry)
 
     def refresh_song(self) -> None:
         self.update_song()
