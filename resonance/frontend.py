@@ -32,7 +32,7 @@ from .backend import (
 )
 
 QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
-APP_VERSION = "0.1.1"
+APP_VERSION = "0.1.2"
 GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )
@@ -771,3 +771,4 @@ def create_app() -> ResonanceApp:
             "resonance.app"
         )
     return ResonanceApp()
+
