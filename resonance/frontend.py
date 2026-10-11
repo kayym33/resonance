@@ -11,6 +11,7 @@ from pathlib import Path
 from io import BytesIO
 from tkinter import messagebox
 from typing import Any
+from urllib.request import urlopen
 
 import customtkinter
 from PIL import Image
@@ -32,6 +33,7 @@ from .constants import (
     APP_SIZES,
     APP_VERSION,
     QUOTES,
+    MIN_LOADING_TIME
 )
 from . import updater
 
@@ -39,10 +41,11 @@ from . import updater
 class ResonanceApp(customtkinter.CTk):
     def __init__(self) -> None:
         super().__init__()
-        self.size_var: tk.StringVar = tk.StringVar(value="Medium")
-        self.current_size_name: str = "Medium"
+        self.size_var: tk.StringVar = tk.StringVar(value="100")
+        self.current_size_name: str = "100"
+        self.smallest_size_name: str = next(iter(APP_SIZES))
         self.controls_visible: bool = True
-        self.geometry(APP_SIZES["Medium"][0])
+        self.geometry(APP_SIZES["100"][0])
         self.resizable(False, False)
         self.title("Resonance")
         self.attributes("-topmost", True)
@@ -73,41 +76,14 @@ class ResonanceApp(customtkinter.CTk):
         self.worker: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=2)
         self.song_request_active: bool = False
         self.album_art_request_active: bool = False
+        self.loading_visible: bool = True
+        self.loading_animation_id: str | None = None
+        self.loading_progress_id: str | None = None
+        self.loading_progress_value: float = 0.0
+        self.loading_started_at: float = time.monotonic()
         self.quote_index: int = 0
-        self.context_menu: tk.Menu = tk.Menu(self, tearoff=False)
-        self.context_menu.add_command(
-            label="Open Spotify",
-            command=self.open_spotify,
-        )
-        self.context_menu.add_separator()
-        self.context_menu.add_checkbutton(
-            label="Always on top",
-            variable=self.always_on_top_var,
-            command=self.toggle_always_on_top,
-        )
-        self.size_menu: tk.Menu = tk.Menu(self.context_menu, tearoff=False)
-        for size_name in APP_SIZES:
-            self.size_menu.add_radiobutton(
-                label=size_name,
-                variable=self.size_var,
-                value=size_name,
-                command=lambda name=size_name: self.set_app_size(name),
-            )
-        self.context_menu.add_cascade(label="Size", menu=self.size_menu)
-        self.context_menu.add_command(
-            label="Refresh song",
-            command=self.refresh_song,
-        )
-        self.context_menu.add_command(
-            label="Check for updates",
-            command=self.check_for_updates,
-        )
-        self.context_menu.add_command(
-            label="About Resonance",
-            command=self.show_about,
-        )
-        self.context_menu.add_separator()
-        self.context_menu.add_command(label="Exit", command=self.close_app)
+        self.context_menu: customtkinter.CTkToplevel | None = None
+        self.update_check_enabled: bool = True
 
         self.time_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self,
@@ -138,8 +114,8 @@ class ResonanceApp(customtkinter.CTk):
 
         self.album_art_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self,
-            width=108,
-            height=108,
+            width=128,
+            height=128,
             corner_radius=4,
             fg_color="#FFFFFF",
             border_width=0,
@@ -150,8 +126,8 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.album_art_frame,
             text="",
-            width=100,
-            height=100,
+            width=120,
+            height=120,
             corner_radius=2,
         )
         self.album_art_label.pack(expand=True)
@@ -170,12 +146,20 @@ class ResonanceApp(customtkinter.CTk):
         )
         self.track_text_frame.pack(fill="x", expand=True)
 
-        self.song_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
+        self.title_viewport: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self.track_text_frame,
+            fg_color="transparent",
+        )
+        self.title_viewport.pack(fill="x")
+
+        self.song_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
+            self.title_viewport,
             text="Checking Spotify...",
             font=customtkinter.CTkFont(family="Arial", size=18, weight="bold"),
             text_color="#6F3044",
             anchor="center",
+            justify="center",
+            wraplength=260,
         )
         self.song_label.pack(fill="x")
 
@@ -203,6 +187,15 @@ class ResonanceApp(customtkinter.CTk):
         )
         self.progress_frame.pack(fill="x", pady=(10, 0))
 
+        self.progress_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
+            self.progress_frame,
+            text="0:00 / 0:00",
+            font=customtkinter.CTkFont(family="Arial", size=10),
+            text_color="#9A5B6D",
+            anchor="center",
+        )
+        self.progress_label.pack(fill="x", pady=(0, 3))
+
         self.progress_bar: customtkinter.CTkSlider = customtkinter.CTkSlider(
             self.progress_frame,
             from_=0,
@@ -221,15 +214,6 @@ class ResonanceApp(customtkinter.CTk):
         )
         self.progress_bar.set(0)
         self.progress_bar.pack(fill="x")
-
-        self.progress_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
-            self.progress_frame,
-            text="0:00 / 0:00",
-            font=customtkinter.CTkFont(family="Arial", size=10),
-            text_color="#9A5B6D",
-            anchor="e",
-        )
-        self.progress_label.pack(fill="x", pady=(2, 0))
 
         self.volume_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self.track_text_frame,
@@ -267,7 +251,15 @@ class ResonanceApp(customtkinter.CTk):
             self,
             fg_color="transparent",
         )
-        self.controls_frame.pack(fill="x", padx=16, pady=(0, 14))
+        self.controls_frame.pack(
+            fill="x",
+            padx=16,
+            pady=(
+                (16, 20)
+                if self.current_size_name == self.smallest_size_name
+                else (10, 14)
+            ),
+        )
 
         self.previous_button: customtkinter.CTkButton = customtkinter.CTkButton(
             self.controls_frame,
@@ -307,6 +299,54 @@ class ResonanceApp(customtkinter.CTk):
             command=self.next_song,
         )
         self.next_button.pack(side="left", expand=True, padx=5)
+
+        self.loading_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
+            self,
+            fg_color="#FFF1F5",
+            corner_radius=0,
+        )
+        self.loading_frame.place(
+            relx=0,
+            rely=0,
+            relwidth=1,
+            relheight=1,
+        )
+        self.loading_title: customtkinter.CTkLabel = customtkinter.CTkLabel(
+            self.loading_frame,
+            text="Connecting to Spotify...",
+            font=customtkinter.CTkFont(
+                family="Segoe UI",
+                size=24,
+                weight="bold",
+            ),
+            text_color="#B84F6B",
+        )
+        self.loading_title.place(relx=0.5, rely=0.46, anchor="center")
+        self.loading_status: customtkinter.CTkLabel = customtkinter.CTkLabel(
+            self.loading_frame,
+            text="Just a moment ♡",
+            font=customtkinter.CTkFont(
+                family="Segoe UI",
+                size=12,
+                slant="italic",
+            ),
+            text_color="#9A5B6D",
+        )
+        self.loading_status.place(relx=0.5, rely=0.54, anchor="center")
+        self.loading_progress: customtkinter.CTkProgressBar = (
+            customtkinter.CTkProgressBar(
+                self.loading_frame,
+                width=190,
+                height=10,
+                corner_radius=5,
+                border_width=0,
+                progress_color="#E05A7A",
+                fg_color="#F0B1C0",
+            )
+        )
+        self.loading_progress.set(0)
+        self.loading_progress.place(relx=0.5, rely=0.61, anchor="center")
+        self.animate_loading_progress()
 
         self.update_time()
         self.update_quote()
@@ -375,25 +415,194 @@ class ResonanceApp(customtkinter.CTk):
         self.geometry(f"+{x}+{y}")
 
     def show_context_menu(self, event: tk.Event[tk.Misc]) -> None:
-        try:
-            self.context_menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            self.context_menu.grab_release()
+        if self.context_menu is not None:
+            self.context_menu.destroy()
+
+        menu = customtkinter.CTkToplevel(self)
+        self.context_menu = menu
+        menu.overrideredirect(True)
+        menu.attributes("-topmost", True)
+        menu.configure(fg_color="#FFF1F5")
+        _, scaling = APP_SIZES[self.current_size_name]
+        menu_width = round(320 / scaling)
+        menu_height = round(340 / scaling)
+        menu.geometry(
+            f"{menu_width}x{menu_height}+{event.x_root}+{event.y_root}"
+        )
+        menu.bind("<Escape>", lambda _: self.close_context_menu())
+        menu.focus_force()
+
+        frame = customtkinter.CTkFrame(
+            menu,
+            fg_color="#FFF1F5",
+            border_color="#F0B1C0",
+            border_width=1,
+            corner_radius=14,
+        )
+        frame.pack(fill="both", expand=True)
+
+        title = customtkinter.CTkLabel(
+            frame,
+            text="  RESONANCE",
+            anchor="w",
+            text_color="#B84F6B",
+            font=customtkinter.CTkFont(
+                family="Segoe UI",
+                size=11,
+                weight="bold",
+            ),
+        )
+        title.pack(fill="x", padx=8, pady=(10, 5))
+
+        self.add_menu_button(frame, "Open Spotify", self.open_spotify)
+        self.add_menu_button(
+            frame,
+            f"{'✓' if self.always_on_top_var.get() else ' '}  Always on top",
+            self.toggle_menu_always_on_top,
+        )
+
+        size_frame = customtkinter.CTkFrame(frame, fg_color="transparent")
+        size_frame.pack(fill="x", padx=8, pady=2)
+        size_label = customtkinter.CTkLabel(
+            size_frame,
+            text="  Size",
+            anchor="w",
+            text_color="#6F3044",
+            font=customtkinter.CTkFont(family="Segoe UI", size=11),
+        )
+        size_label.pack(side="left", fill="x", expand=True)
+        for size_name in APP_SIZES:
+            button = customtkinter.CTkButton(
+                size_frame,
+                text=size_name,
+                width=29,
+                height=24,
+                corner_radius=8,
+                fg_color="#E58AA0" if size_name == self.size_var.get()
+                else "transparent",
+                hover_color="#D8758F",
+                text_color="#FFFFFF" if size_name == self.size_var.get()
+                else "#9A5B6D",
+                font=customtkinter.CTkFont(size=10, weight="bold"),
+                command=lambda name=size_name: self.set_menu_size(name),
+            )
+            button.pack(side="left", padx=1)
+
+        self.add_menu_button(frame, "Refresh song", self.refresh_song)
+        update_button = self.add_menu_button(
+            frame,
+            "Check for updates",
+            self.check_for_updates,
+        )
+        if not self.update_check_enabled:
+            update_button.configure(state="disabled")
+        self.add_menu_button(frame, "About Resonance", self.show_about)
+        self.add_menu_button(
+            frame,
+            "Exit",
+            self.close_app,
+            text_color="#B84F6B",
+        )
+
+    def add_menu_button(
+        self,
+        parent: customtkinter.CTkFrame,
+        text: str,
+        command: Any,
+        text_color: str = "#6F3044",
+    ) -> customtkinter.CTkButton:
+        button = customtkinter.CTkButton(
+            parent,
+            text=text,
+            command=lambda: self.invoke_menu_command(command),
+            anchor="w",
+            height=32,
+            corner_radius=8,
+            fg_color="transparent",
+            hover_color="#F0B1C0",
+            text_color=text_color,
+            font=customtkinter.CTkFont(family="Segoe UI", size=11),
+        )
+        button.pack(fill="x", padx=8, pady=2)
+        return button
+
+    def invoke_menu_command(self, command: Any) -> None:
+        self.close_context_menu()
+        command()
+
+    def close_context_menu(self) -> None:
+        if self.context_menu is not None:
+            self.context_menu.destroy()
+            self.context_menu = None
+
+    def toggle_menu_always_on_top(self) -> None:
+        self.always_on_top_var.set(not self.always_on_top_var.get())
+        self.toggle_always_on_top()
+        self.close_context_menu()
+
+    def set_menu_size(self, size_name: str) -> None:
+        self.set_app_size(size_name)
+        self.close_context_menu()
 
     def open_spotify(self) -> None:
         if not webbrowser.open("spotify:"):
             webbrowser.open("https://open.spotify.com/")
 
     def show_about(self) -> None:
-        messagebox.showinfo(
-            "About Resonance",
-            f"Resonance {APP_VERSION}\n\n"
-            f"Author: {APP_AUTHOR}\n"
-            f"Email: {APP_EMAIL}\n"
-            f"Repository: {APP_REPOSITORY}\n"
-            f"Platform: {sys.platform}",
-            parent=self,
+        dialog = customtkinter.CTkToplevel(self)
+        dialog.title("About Resonance")
+        dialog.geometry("330x285")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.configure(fg_color="#FFF1F5")
+
+        card = customtkinter.CTkFrame(
+            dialog,
+            fg_color="#FFF1F5",
+            border_color="#F0B1C0",
+            border_width=1,
+            corner_radius=16,
         )
+        card.pack(fill="both", expand=True, padx=8, pady=8)
+        customtkinter.CTkLabel(
+            card,
+            text="Resonance",
+            text_color="#B84F6B",
+            font=customtkinter.CTkFont(
+                family="Segoe UI",
+                size=24,
+                weight="bold",
+            ),
+        ).pack(pady=(22, 2))
+        customtkinter.CTkLabel(
+            card,
+            text=f"version {APP_VERSION}",
+            text_color="#9A5B6D",
+            font=customtkinter.CTkFont(family="Segoe UI", size=11),
+        ).pack()
+        customtkinter.CTkLabel(
+            card,
+            text=(
+                f"made with love by {APP_AUTHOR}\n"
+                f"{APP_EMAIL}\n\n"
+                f"{APP_REPOSITORY}"
+            ),
+            text_color="#6F3044",
+            justify="center",
+            wraplength=285,
+            font=customtkinter.CTkFont(family="Segoe UI", size=10),
+        ).pack(pady=(15, 8))
+        customtkinter.CTkButton(
+            card,
+            text="Close",
+            width=100,
+            height=32,
+            corner_radius=10,
+            fg_color="#D8758F",
+            hover_color="#C96B86",
+            command=dialog.destroy,
+        ).pack(pady=(0, 14))
 
     def toggle_always_on_top(self) -> None:
         self.always_on_top = self.always_on_top_var.get()
@@ -405,51 +614,42 @@ class ResonanceApp(customtkinter.CTk):
             raise ValueError(f"Unknown app size: {size_name}")
 
         geometry, scaling = size
+        self.size_var.set(size_name)
         self.current_size_name = size_name
         customtkinter.set_widget_scaling(scaling)
         customtkinter.set_window_scaling(scaling)
         self.geometry(geometry)
         width = int(geometry.split("x", maxsplit=1)[0])
+        self.song_label.configure(wraplength=max(180, width - 40))
         self.user_label.configure(wraplength=max(180, width - 40))
-        if size_name == "Small":
-            self.hide_controls()
-        else:
-            self.show_controls()
+        self.controls_frame.pack_configure(
+            pady=(16, 20)
+            if size_name == self.smallest_size_name
+            else (10, 14)
+        )
+        self.show_controls()
 
     def handle_pointer_motion(self, event: tk.Event[tk.Misc]) -> None:
-        if self.current_size_name != "Small":
-            return
-
-        pointer_y = event.y_root - self.winfo_rooty()
-        if pointer_y >= self.winfo_height() * 0.8:
-            self.show_controls()
-        elif self.controls_visible and pointer_y < self.winfo_height() * 0.7:
-            self.hide_controls()
+        return
 
     def hide_controls(self) -> None:
         if not self.controls_visible:
             return
-        if self.current_size_name == "Small":
-            self.controls_frame.pack_forget()
-            self.controls_frame.place_forget()
-        else:
-            self.controls_frame.pack_forget()
+        self.controls_frame.pack_forget()
         self.controls_visible = False
 
     def show_controls(self) -> None:
         if self.controls_visible:
             return
-        if self.current_size_name == "Small":
-            self.controls_frame.place(
-                relx=0,
-                rely=1.0,
-                anchor="sw",
-                relwidth=1.0,
-                x=0,
-                y=-4,
-            )
-        else:
-            self.controls_frame.pack(fill="x", padx=16, pady=(0, 14))
+        self.controls_frame.pack(
+            fill="x",
+            padx=16,
+            pady=(
+                (16, 20)
+                if self.current_size_name == self.smallest_size_name
+                else (10, 14)
+            ),
+        )
         self.controls_visible = True
 
     def refresh_song(self) -> None:
@@ -501,10 +701,8 @@ class ResonanceApp(customtkinter.CTk):
             )
             return
 
-        self.context_menu.entryconfigure(
-            "Check for updates",
-            state=tk.DISABLED,
-        )
+        self.update_check_enabled = False
+        self.close_context_menu()
         self.worker.submit(self.find_update).add_done_callback(
             self.update_check_finished
         )
@@ -519,10 +717,7 @@ class ResonanceApp(customtkinter.CTk):
         self,
         future: Future[tuple[str, str] | None],
     ) -> None:
-        self.context_menu.entryconfigure(
-            "Check for updates",
-            state=tk.NORMAL,
-        )
+        self.update_check_enabled = True
         try:
             update = future.result()
         except Exception as error:
@@ -586,11 +781,16 @@ class ResonanceApp(customtkinter.CTk):
         try:
             song: dict[str, Any] = future.result()
         except Exception:
-            self.artist_label.configure(text="Spotify unavailable")
+            self.artist_label.configure(text="Spotify unavailable :<")
+            self.loading_title.configure(text="Connecting to Spotify...")
+            self.loading_status.configure(text="Please open Spotify and try again ♡")
             self.after(SPOTIFY_REFRESH_TIME * 1000, self.update_song)
             return
 
-        self.song_label.configure(text=song["title"])
+        username = str(song.get("username") or "Spotify user")
+        self.user_label.configure(text=f"hii {username} !")
+        self.finish_loading(username)
+        self.song_label.configure(text=str(song["title"]))
         self.artist_label.configure(text=song["artist"])
         album: str = song["album"]
         device: str = song["device"]
@@ -613,6 +813,91 @@ class ResonanceApp(customtkinter.CTk):
 
         self.after(SPOTIFY_REFRESH_TIME * 1000, self.update_song)
 
+    def finish_loading(self, username: str) -> None:
+        if not self.loading_visible:
+            return
+
+        self.loading_title.configure(text=f"hii {username} !")
+        self.loading_status.configure(text="Spotify connected ♡")
+        elapsed = time.monotonic() - self.loading_started_at
+        remaining_ms = max(0, (MIN_LOADING_TIME - elapsed) * 1000)
+        self.after(
+            round(remaining_ms) + 550,
+            self.animate_loading_fade,
+        )
+
+    def animate_loading_progress(self) -> None:
+        if not self.loading_visible:
+            self.loading_progress_id = None
+            return
+
+        elapsed = time.monotonic() - self.loading_started_at
+        self.loading_progress_value = min(
+            1.0,
+            elapsed / MIN_LOADING_TIME,
+        )
+        self.loading_progress.set(self.loading_progress_value)
+        if self.loading_progress_value >= 1.0:
+            self.loading_progress_id = None
+            return
+
+        self.loading_progress_id = self.after(
+            16,
+            self.animate_loading_progress,
+        )
+
+    def animate_loading_fade(self, step: int = 0) -> None:
+        if not self.loading_visible:
+            return
+
+        fade_steps = 24
+        fade_amount = min(step + 1, fade_steps) / fade_steps
+        background = "#FFF1F5"
+        title_color = self.blend_color("#B84F6B", background, fade_amount)
+        status_color = self.blend_color("#9A5B6D", background, fade_amount)
+        bar_color = self.blend_color("#E05A7A", background, fade_amount)
+        bar_background = self.blend_color("#F0B1C0", background, fade_amount)
+        self.loading_title.configure(text_color=title_color)
+        self.loading_status.configure(text_color=status_color)
+        self.loading_progress.configure(
+            progress_color=bar_color,
+            fg_color=bar_background,
+        )
+        if step >= fade_steps:
+            self.loading_frame.place_forget()
+            self.loading_visible = False
+            self.loading_animation_id = None
+            return
+
+        self.loading_animation_id = self.after(
+            16,
+            self.animate_loading_fade,
+            step + 1,
+        )
+
+    @staticmethod
+    def blend_color(
+        start: str,
+        end: str,
+        amount: float,
+    ) -> str:
+        start_rgb = tuple(
+            int(start[index:index + 2], 16)
+            for index in (1, 3, 5)
+        )
+        end_rgb = tuple(
+            int(end[index:index + 2], 16)
+            for index in (1, 3, 5)
+        )
+        channels = (
+            round(
+                start_channel
+                + (end_channel - start_channel) * amount
+            )
+            for start_channel, end_channel in zip(start_rgb, end_rgb)
+        )
+        return "#" + "".join(f"{channel:02x}" for channel in channels)
+
     def update_progress(self) -> None:
         progress_ms: int = self.progress_ms
         if self.is_playing:
@@ -630,7 +915,7 @@ class ResonanceApp(customtkinter.CTk):
             text=f"{self.format_time(progress_ms)} / "
             f"{self.format_time(self.duration_ms)}"
         )
-        self.after(REFRESH_TIME * 1000, self.update_progress)
+        self.after(100, self.update_progress)
 
     def change_playback_position(self, value: float) -> None:
         if not self.duration_ms:
@@ -703,7 +988,7 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art = customtkinter.CTkImage(
             light_image=image,
             dark_image=image,
-            size=(100, 100),
+            size=(120, 120),
         )
         self.album_art_label.configure(image=self.album_art, text="")
 
@@ -724,7 +1009,7 @@ class ResonanceApp(customtkinter.CTk):
 
 
 def create_app() -> ResonanceApp:
-    customtkinter.set_appearance_mode("light")
+    customtkinter.set_appearance_mode("dark")
     theme_path = Path(__file__).resolve().parents[1] / "assets" / "pink_theme.json"
     customtkinter.set_default_color_theme(str(theme_path))
     if os.name == "nt":
