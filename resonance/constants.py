@@ -6,7 +6,7 @@ from typing import Any
 
 
 QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
-APP_VERSION = "0.1.3"
+APP_VERSION = "0.1.4"
 APP_AUTHOR = "kayla"
 APP_EMAIL = "kayla.mcdade.2023@uni.strath.ac.uk"
 APP_REPOSITORY = "https://github.com/kayym33/resonance"
@@ -33,4 +33,5 @@ def load_quotes() -> tuple[str, ...]:
 
 
 QUOTES: tuple[str, ...] = load_quotes()
+
 
