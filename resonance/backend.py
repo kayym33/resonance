@@ -89,3 +89,5 @@ def next_song() -> None:
 
 def previous_song() -> None:
     spotify.previous_track()
+def seek_playback(position_ms: int) -> None:
+    spotify.seek_track(max(0, position_ms))
