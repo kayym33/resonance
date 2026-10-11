@@ -135,7 +135,7 @@ use must be added as a test user in the application's dashboard.
 | Playback position | Drag the progress slider |
 | Volume | Drag the volume slider |
 | More options | Right-click anywhere in the window |
-| Change size | Right-click, then choose **Size** and select **Small**, **Medium**, or **Large** |
+| Change size | Right-click, then choose **Size** and select **Small**, **Medium**, **Medium Plus**, **Large**, or **Extra Large** |
 | Close Resonance | Use the window close button, **Exit**, `Ctrl+Q`, or `Escape` |
 
 Playback controls work only when Spotify Premium is active and Spotify has an

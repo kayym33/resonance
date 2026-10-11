@@ -9,6 +9,7 @@ import time
 import tkinter as tk
 import webbrowser
 import ctypes
+import getpass
 import json
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
@@ -37,10 +38,13 @@ GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )
 APP_SIZES: dict[str, tuple[str, float]] = {
-    "Small": ("260x350", 1.0),
-    "Medium": ("320x450", 1.0),
-    "Large": ("375x500", 1.25),
+    "Small": ("260x350", 1.1),
+    "Medium": ("320x450", 1.1),
+    "Medium Plus": ("350x475", 1.21),
+    "Large": ("375x500", 1.375),
+    "Extra Large": ("450x600", 1.65),
 }
+STARTUP_MINIMUM_SECONDS = 1.3
 
 
 def load_quotes() -> tuple[str, ...]:
@@ -70,7 +74,7 @@ class ResonanceApp(customtkinter.CTk):
         self.attributes("-topmost", True)
         self.configure(fg_color="#FFF1F5")
         self.bind("<Map>", self.restore_topmost)
-        self.bind_all("<Button-3>", self.show_context_menu)
+        self.bind("<ButtonRelease-3>", self.show_context_menu)
         self.bind_all("<Motion>", self.handle_pointer_motion)
         self.bind_all("<Control-q>", self.close_app)
         self.bind_all("<Escape>", self.close_app)
@@ -96,7 +100,19 @@ class ResonanceApp(customtkinter.CTk):
         self.song_request_active: bool = False
         self.album_art_request_active: bool = False
         self.quote_index: int = 0
-        self.context_menu: tk.Menu = tk.Menu(self, tearoff=False)
+        menu_style: dict[str, Any] = {
+            "tearoff": False,
+            "background": "#FFF1F5",
+            "foreground": "#6F3044",
+            "activebackground": "#E58AA0",
+            "activeforeground": "#FFFFFF",
+            "disabledforeground": "#B07182",
+            "selectcolor": "#D8758F",
+            "font": ("Arial", 10),
+            "borderwidth": 0,
+            "relief": "flat",
+        }
+        self.context_menu: tk.Menu = tk.Menu(self, **menu_style)
         self.context_menu.add_command(
             label="Open Spotify",
             command=self.open_spotify,
@@ -107,7 +123,7 @@ class ResonanceApp(customtkinter.CTk):
             variable=self.always_on_top_var,
             command=self.toggle_always_on_top,
         )
-        self.size_menu: tk.Menu = tk.Menu(self.context_menu, tearoff=False)
+        self.size_menu: tk.Menu = tk.Menu(self.context_menu, **menu_style)
         for size_name in APP_SIZES:
             self.size_menu.add_radiobutton(
                 label=size_name,
@@ -326,12 +342,140 @@ class ResonanceApp(customtkinter.CTk):
         )
         self.next_button.pack(side="left", expand=True, padx=5)
 
+        self.startup_overlay: customtkinter.CTkFrame = customtkinter.CTkFrame(
+            self,
+            fg_color="#FFF1F5",
+            corner_radius=0,
+        )
+        self.startup_overlay.place(
+            relx=0,
+            rely=0,
+            relwidth=1,
+            relheight=1,
+        )
+
+        startup_icon_path = (
+            Path(__file__).resolve().parents[1] / "assets" / "icon-original.jpg"
+        )
+        startup_icon = Image.open(startup_icon_path).convert("RGBA")
+        self.startup_icon_image: customtkinter.CTkImage = (
+            customtkinter.CTkImage(
+                light_image=startup_icon,
+                dark_image=startup_icon,
+                size=(76, 76),
+            )
+        )
+        customtkinter.CTkLabel(
+            self.startup_overlay,
+            text="",
+            image=self.startup_icon_image,
+        ).pack(pady=(88, 12))
+        customtkinter.CTkLabel(
+            self.startup_overlay,
+            text="Resonance",
+            font=customtkinter.CTkFont(
+                family="Segoe UI",
+                size=20,
+                weight="bold",
+            ),
+            text_color="#6F3044",
+        ).pack()
+        startup_username = getpass.getuser().strip().title() or "there"
+        self.startup_greeting = f"hii, {startup_username.lower()} !"
+        customtkinter.CTkLabel(
+            self.startup_overlay,
+            text=self.startup_greeting,
+            font=customtkinter.CTkFont(
+                family="Arial",
+                size=16,
+                slant="italic",
+            ),
+            text_color="#9A5B6D",
+        ).pack(pady=(8, 0))
+        self.startup_status_label: customtkinter.CTkLabel = (
+            customtkinter.CTkLabel(
+                self.startup_overlay,
+                text="Starting up",
+                font=customtkinter.CTkFont(
+                    family="Arial",
+                    size=11,
+                ),
+                text_color="#9A5B6D",
+            )
+        )
+        self.startup_status_label.pack(pady=(28, 8))
+        self.startup_progress: customtkinter.CTkProgressBar = (
+            customtkinter.CTkProgressBar(
+                self.startup_overlay,
+                width=170,
+                height=6,
+                corner_radius=3,
+                progress_color="#D8758F",
+                fg_color="#F0B1C0",
+            )
+        )
+        self.startup_progress.set(0)
+        self.startup_progress.pack()
+        self.startup_started_at: float = time.monotonic()
+        self.startup_ready: bool = False
+        self.startup_finish_scheduled: bool = False
+
         self.update_time()
         self.update_quote()
         self.update_song()
         self.update_progress()
         self.after(100, self.configure_taskbar_presence)
         self.after(500, self.configure_taskbar_presence)
+        self.after(5, self.animate_startup)
+        self.after(10_000, self.finish_startup)
+        self.center_window()
+
+    def center_window(self) -> None:
+        self.update_idletasks()
+        window_width = self.winfo_width()
+        window_height = self.winfo_height()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        position_x = max(0, (screen_width - window_width) // 2)
+        position_y = max(0, (screen_height - window_height) // 2)
+        self.geometry(
+            f"{window_width}x{window_height}+{position_x}+{position_y}"
+        )
+
+    def animate_startup(self) -> None:
+        elapsed = time.monotonic() - self.startup_started_at
+        linear_progress = min(elapsed / 0.9, 1.0)
+        progress = 1 - (1 - linear_progress) ** 3
+        self.startup_progress.set(progress)
+        if linear_progress < 0.4:
+            status = "Starting up"
+        elif linear_progress < 0.8:
+            status = "Connecting to Spotify"
+        else:
+            status = "Almost ready"
+        self.startup_status_label.configure(text=status)
+        if linear_progress >= 1.0:
+            if not self.startup_ready:
+                self.startup_status_label.configure(text="Waiting for Spotify")
+            return
+        self.after(5, self.animate_startup)
+
+    def finish_startup(self) -> None:
+        if self.startup_ready:
+            return
+        remaining = STARTUP_MINIMUM_SECONDS - (
+            time.monotonic() - self.startup_started_at
+        )
+        if remaining > 0:
+            if not self.startup_finish_scheduled:
+                self.startup_finish_scheduled = True
+                self.after(
+                    max(1, round(remaining * 1000)),
+                    self.finish_startup,
+                )
+            return
+        self.startup_ready = True
+        self.startup_overlay.place_forget()
 
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
@@ -392,11 +536,9 @@ class ResonanceApp(customtkinter.CTk):
         y: int = event.y_root - self.drag_start_y
         self.geometry(f"+{x}+{y}")
 
-    def show_context_menu(self, event: tk.Event[tk.Misc]) -> None:
-        try:
-            self.context_menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            self.context_menu.grab_release()
+    def show_context_menu(self, event: tk.Event[tk.Misc]) -> str:
+        self.context_menu.tk_popup(event.x_root, event.y_root)
+        return "break"
 
     def open_spotify(self) -> None:
         if not webbrowser.open("spotify:"):
@@ -638,9 +780,11 @@ class ResonanceApp(customtkinter.CTk):
             song: dict[str, Any] = future.result()
         except Exception:
             self.artist_label.configure(text="Spotify unavailable")
+            self.finish_startup()
             self.after(SPOTIFY_REFRESH_TIME * 1000, self.update_song)
             return
 
+        self.finish_startup()
         self.song_label.configure(text=song["title"])
         self.artist_label.configure(text=song["artist"])
         album: str = song["album"]

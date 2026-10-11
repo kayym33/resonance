@@ -96,6 +96,7 @@ jobs:
             --icon=assets\icon.ico `
             --add-data "assets\pink_theme.json;assets" `
             --add-data "assets\icon.ico;assets" `
+            --add-data "assets\icon-original.jpg;assets" `
             --add-data "assets\quotes.json;assets" `
             main.py
 
@@ -139,6 +140,8 @@ jobs:
         run: |
           pyinstaller --clean --onefile --windowed --name Resonance-linux \
             --add-data "assets/pink_theme.json:assets" \
+            --add-data "assets/icon.ico:assets" \
+            --add-data "assets/icon-original.jpg:assets" \
             --add-data "assets/quotes.json:assets" \
             main.py
 
