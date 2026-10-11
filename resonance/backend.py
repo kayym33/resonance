@@ -33,13 +33,25 @@ def get_spotify_client() -> spotipy.Spotify:
 
 
 spotify: spotipy.Spotify = get_spotify_client()
+spotify_username: str | None = None
 
 
 def get_current_song() -> dict[str, Any]:
+    global spotify_username
+
+    if spotify_username is None:
+        user: dict[str, Any] = spotify.current_user()
+        spotify_username = (
+            user.get("display_name")
+            or user.get("id")
+            or "Spotify user"
+        )
+
     playing = spotify.current_playback()
 
     if not playing or not playing.get("item"):
         return {
+            "username": spotify_username,
             "title": "Nothing playing",
             "artist": "",
             "album": "",
@@ -57,6 +69,7 @@ def get_current_song() -> dict[str, Any]:
     )
     images: list[dict[str, Any]] = track.get("album", {}).get("images", [])
     return {
+        "username": spotify_username,
         "title": track["name"],
         "artist": artist,
         "album": track.get("album", {}).get("name", ""),
