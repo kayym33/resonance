@@ -80,21 +80,13 @@ The Windows `.exe` is not required on Linux; run the Python version instead.
 
 ## Update the Windows app
 
-Windows executable updates are published through GitHub Releases. A normal
-code push does not replace an already-installed executable.
+Windows executable updates are published through GitHub Releases. When a pull
+request is merged into `main`, GitHub Actions automatically:
 
-To publish an update:
-
-1. Change `APP_VERSION` in `resonance/frontend.py`.
-2. Commit and push the change.
-3. Create and push a version tag, for example:
-
-   ```powershell
-   git tag v0.2.0
-   git push origin v0.2.0
-   ```
-
-4. GitHub Actions builds `Resonance.exe` and attaches it to the new release.
+1. Increments the patch version, such as `0.1.1` to `0.1.2`.
+2. Commits the new `APP_VERSION` back to `main`.
+3. Builds `Resonance.exe` on a Windows runner.
+4. Creates a matching GitHub Release, such as `v0.1.2`.
 
 Users can then right-click the Windows app and choose **Check for updates**.
 After they confirm, Resonance downloads the new executable, closes, replaces

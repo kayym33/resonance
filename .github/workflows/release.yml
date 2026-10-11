@@ -1,24 +1,90 @@
 name: Build Windows release
 
 on:
-  push:
-    tags:
-      - "v*"
+  pull_request:
+    types: [closed]
+    branches:
+      - main
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: github.event.pull_request.merged == true
     runs-on: windows-latest
     steps:
-      - name: Check out source
+      - name: Check out main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Calculate and commit patch version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $versionLine = Select-String `
+            -Path resonance/frontend.py `
+            -Pattern 'APP_VERSION = "(\d+\.\d+\.\d+)"'
+          if ($null -eq $versionLine) {
+            throw "Could not find APP_VERSION in resonance/frontend.py"
+          }
+
+          $currentVersion = $versionLine.Matches[0].Groups[1].Value
+          $latestTag = gh release list --limit 1 --json tagName --jq '.[0].tagName'
+          if ([string]::IsNullOrWhiteSpace($latestTag)) {
+            $latestTag = "v$currentVersion"
+          }
+
+          if ($latestTag -notmatch '^v(\d+)\.(\d+)\.(\d+)$') {
+            throw "Latest release tag '$latestTag' is not valid semver"
+          }
+
+          $latestVersion = [version]$latestTag.Substring(1)
+          $sourceVersion = [version]$currentVersion
+          $baseVersion = [version]::new(
+            [Math]::Max($latestVersion.Major, $sourceVersion.Major),
+            [Math]::Max($latestVersion.Minor, $sourceVersion.Minor),
+            [Math]::Max($latestVersion.Build, $sourceVersion.Build)
+          )
+          if ($sourceVersion -gt $latestVersion) {
+            $baseVersion = $sourceVersion
+          } elseif ($latestVersion -gt $sourceVersion) {
+            $baseVersion = $latestVersion
+          }
+
+          $nextVersion = "{0}.{1}.{2}" -f `
+            $baseVersion.Major, `
+            $baseVersion.Minor, `
+            ($baseVersion.Build + 1)
+          $nextTag = "v$nextVersion"
+
+          (Get-Content resonance/frontend.py -Raw) `
+            -replace 'APP_VERSION = "\d+\.\d+\.\d+"', `
+              "APP_VERSION = `"$nextVersion`"" `
+            | Set-Content resonance/frontend.py -Encoding utf8
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add resonance/frontend.py
+          git commit -m "chore: bump app version to $nextVersion [skip ci]"
+          git push origin HEAD:main
+          git tag $nextTag
+          git push origin $nextTag
+
+          "NEXT_VERSION=$nextVersion" >> $env:GITHUB_ENV
+          "NEXT_TAG=$nextTag" >> $env:GITHUB_ENV
 
       - name: Install dependencies
         run: python -m pip install spotipy customtkinter pillow pyinstaller
@@ -36,5 +102,7 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.NEXT_TAG }}
+          name: Resonance ${{ env.NEXT_TAG }}
           files: dist/Resonance.exe
           generate_release_notes: true
