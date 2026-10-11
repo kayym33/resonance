@@ -13,6 +13,7 @@ import json
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from io import BytesIO
+from tkinter import messagebox
 from typing import Any
 from urllib.request import Request, urlopen
 
@@ -25,11 +26,12 @@ from .backend import (
     get_time,
     next_song,
     previous_song,
+    seek_playback,
     toggle_playback,
 )
 
 QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )
@@ -82,6 +84,7 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art: customtkinter.CTkImage | None = None
         self.progress_ms: int = 0
         self.duration_ms: int = 0
+        self.seek_after_id: str | None = None
         self.is_playing: bool = False
         self.progress_updated_at: float = time.monotonic()
         self.always_on_top: bool = True
@@ -215,14 +218,21 @@ class ResonanceApp(customtkinter.CTk):
         )
         self.progress_frame.pack(fill="x", pady=(10, 0))
 
-        self.progress_bar: customtkinter.CTkProgressBar = (
-            customtkinter.CTkProgressBar(
-                self.progress_frame,
-                height=5,
-                corner_radius=2,
-                progress_color="#E05A7A",
-                fg_color="#F0B1C0",
-            )
+        self.progress_bar: customtkinter.CTkSlider = customtkinter.CTkSlider(
+            self.progress_frame,
+            from_=0,
+            to=1,
+            number_of_steps=1000,
+            height=12,
+            corner_radius=6,
+            border_width=0,
+            button_length=12,
+            button_corner_radius=6,
+            progress_color="#E05A7A",
+            fg_color="#F0B1C0",
+            button_color="#D8758F",
+            button_hover_color="#C96B86",
+            command=self.change_playback_position,
         )
         self.progress_bar.set(0)
         self.progress_bar.pack(fill="x")
@@ -586,7 +596,6 @@ class ResonanceApp(customtkinter.CTk):
         self.duration_ms = duration_ms
         self.is_playing = song["is_playing"]
         self.progress_updated_at = time.monotonic()
-
         if song["album_art_url"] != self.album_art_url:
             self.load_album_art(song["album_art_url"])
 
@@ -610,6 +619,21 @@ class ResonanceApp(customtkinter.CTk):
             f"{self.format_time(self.duration_ms)}"
         )
         self.after(REFRESH_TIME * 1000, self.update_progress)
+
+    def change_playback_position(self, value: float) -> None:
+        if not self.duration_ms:
+            return
+
+        self.progress_ms = round(value * self.duration_ms)
+        self.progress_updated_at = time.monotonic()
+        if self.seek_after_id is not None:
+            self.after_cancel(self.seek_after_id)
+        self.seek_after_id = self.after(300, self.seek_to_current_position)
+
+    def seek_to_current_position(self) -> None:
+        self.seek_after_id = None
+        position_ms = max(0, min(self.progress_ms, self.duration_ms))
+        self.worker.submit(seek_playback, position_ms)
 
     @staticmethod
     def format_time(milliseconds: int) -> str:
