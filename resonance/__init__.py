@@ -1,0 +1,1 @@
+﻿"""Resonance Spotify companion application."""

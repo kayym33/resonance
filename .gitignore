@@ -1,0 +1,27 @@
+# Spotify authorization data
+.cache
+spotify.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Packaging/build output
+build/
+dist/
+*.spec
+
+# Local environment and tooling
+.env
+.env.*
+.vscode/
+.idea/
+
+# Test and coverage output
+.pytest_cache/
+.coverage
+htmlcov/
