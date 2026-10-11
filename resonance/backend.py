@@ -48,7 +48,6 @@ def get_current_song() -> dict[str, Any]:
             "is_playing": False,
             "progress_ms": 0,
             "duration_ms": 0,
-            "volume_percent": None,
         }
 
     track: dict[str, Any] = playing["item"]
@@ -65,7 +64,6 @@ def get_current_song() -> dict[str, Any]:
         "is_playing": playing.get("is_playing", False),
         "progress_ms": playing.get("progress_ms") or 0,
         "duration_ms": track.get("duration_ms") or 0,
-        "volume_percent": playing.get("device", {}).get("volume_percent"),
     }
 
 
@@ -91,7 +89,5 @@ def next_song() -> None:
 
 def previous_song() -> None:
     spotify.previous_track()
-
-
-def set_volume(volume_percent: int) -> None:
-    spotify.volume(max(0, min(100, volume_percent)))
+def seek_playback(position_ms: int) -> None:
+    spotify.seek_track(max(0, position_ms))
