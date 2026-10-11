@@ -35,10 +35,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $versionLine = Select-String `
-            -Path resonance/frontend.py `
+            -Path resonance/constants.py `
             -Pattern 'APP_VERSION = "(\d+\.\d+\.\d+)"'
           if ($null -eq $versionLine) {
-            throw "Could not find APP_VERSION in resonance/frontend.py"
+            throw "Could not find APP_VERSION in resonance/constants.py"
           }
 
           $currentVersion = $versionLine.Matches[0].Groups[1].Value
@@ -70,14 +70,14 @@ jobs:
             ($baseVersion.Build + 1)
           $nextTag = "v$nextVersion"
 
-          (Get-Content resonance/frontend.py -Raw) `
+          (Get-Content resonance/constants.py -Raw) `
             -replace 'APP_VERSION = "\d+\.\d+\.\d+"', `
               "APP_VERSION = `"$nextVersion`"" `
-            | Set-Content resonance/frontend.py -Encoding utf8
+            | Set-Content resonance/constants.py -Encoding utf8
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add resonance/frontend.py
+          git add resonance/constants.py
           git commit -m "chore: bump app version to $nextVersion [skip ci]"
           git push origin HEAD:main
           git tag $nextTag
