@@ -107,15 +107,37 @@ class AccountDialog(customtkinter.CTkToplevel):
         buttons = self.button_row()
         self.sign_in_button = self.button(buttons, "sign in", self.sign_in, solid=True)
         self.button(buttons, "not now", self.destroy)
+        customtkinter.CTkButton(
+            buttons,
+            text="reset password",
+            width=0,
+            height=32,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color=HOVER,
+            text_color=MUTED,
+            font=mono(10),
+            command=self.reset_password,
+        ).pack(side="left")
         self.bind("<Return>", lambda _event: self.sign_in())
+
+    def reset_password(self) -> None:
+        # Accounts are made by hand in the Supabase dashboard, so is this.
+        self.error_label.configure(
+            text=f"haha... ask {APP_AUTHOR} to reset",
+            text_color=MUTED,
+        )
 
     def sign_in(self) -> None:
         email = self.email_entry.get().strip()
         password = self.password_entry.get()
         if not email or not password:
-            self.error_label.configure(text="enter your email and password")
+            self.error_label.configure(
+                text="enter your email and password",
+                text_color=ACCENT_DARK,
+            )
             return
-        self.error_label.configure(text="")
+        self.error_label.configure(text="", text_color=ACCENT_DARK)
         self.sign_in_button.configure(text="signing in...", state="disabled")
         self.app.sync.sign_in(email, password, self.signed_in, self.confirm_switch)
 
