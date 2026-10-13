@@ -18,13 +18,19 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
+from .launcher_panel import LauncherPanel
 from .weather_panel import WeatherPanel
-from .windows import cancel_pending_after, outline_width, prepare_window
+from .windows import (
+    add_rule,
+    cancel_pending_after,
+    outline_width,
+    prepare_window,
+)
 
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
-HUB_GEOMETRY = "620x430"
+HUB_GEOMETRY = "620x500"
 HUB_ART_SIZE = 144
 
 
@@ -74,12 +80,10 @@ class HubWindow(customtkinter.CTkToplevel):
         )
         self.time_label.pack(side="right")
 
-        customtkinter.CTkFrame(
-            self,
-            height=1,
-            corner_radius=0,
-            fg_color=INK,
-        ).pack(fill="x", padx=24, pady=(6, 16))
+        add_rule(self, INK, padx=24, pady=(6, 10))
+
+        self.launcher: LauncherPanel = LauncherPanel(self, self.app)
+        self.launcher.pack(fill="x", padx=24, pady=(0, 10))
 
         customtkinter.CTkLabel(
             self,
@@ -171,6 +175,13 @@ class HubWindow(customtkinter.CTkToplevel):
             self.show_song(self.app.song)
         self.update_time()
         self.update_noise()
+        # The suggestion dropdown floats above the panels packed after it.
+        self.launcher.dropdown.lift()
+        self.after(150, self.focus_launcher)
+
+    def focus_launcher(self) -> None:
+        self.focus_force()
+        self.launcher.focus_prompt()
 
     def add_outlined_button(
         self,
@@ -201,6 +212,7 @@ class HubWindow(customtkinter.CTkToplevel):
         for button in self.outlined_buttons:
             button.configure(border_width=outline_width(self))
         self.weather_panel.refresh_outlines()
+        self.launcher.refresh_outlines()
 
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())

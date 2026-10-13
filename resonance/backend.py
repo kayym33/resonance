@@ -112,3 +112,15 @@ def seek_playback(position_ms: int) -> None:
 
 def set_volume(volume_percent: int) -> None:
     spotify.volume(max(0, min(100, volume_percent)))
+
+
+def play_search(query: str) -> str:
+    """Play the top Spotify track for a search and describe what started."""
+    results = spotify.search(q=query, type="track", limit=1)
+    tracks: list[dict[str, Any]] = results.get("tracks", {}).get("items", [])
+    if not tracks:
+        raise LookupError(f'no tracks found for "{query}"')
+    track = tracks[0]
+    spotify.start_playback(uris=[track["uri"]])
+    artist = ", ".join(artist["name"] for artist in track["artists"])
+    return f"{track['name']} by {artist}"

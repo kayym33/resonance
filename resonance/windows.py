@@ -52,6 +52,23 @@ def outline_width(widget: tk.Misc) -> int:
     return 2 if scaling < 1 else 1
 
 
+def add_rule(
+    parent: tk.Misc,
+    color: str,
+    padx: int = 0,
+    pady: tuple[int, int] = (0, 0),
+) -> tk.Frame:
+    """Pack a 1px horizontal line; CTkFrame draws nothing that thin."""
+    scaling = customtkinter.ScalingTracker.get_widget_scaling(parent)
+    line = tk.Frame(parent, height=1, bg=color, bd=0, highlightthickness=0)
+    line.pack(
+        fill="x",
+        padx=round(padx * scaling),
+        pady=(round(pady[0] * scaling), round(pady[1] * scaling)),
+    )
+    return line
+
+
 def cancel_pending_after(widget: tk.Misc) -> None:
     """Cancel a widget's scheduled callbacks before it is destroyed.
 

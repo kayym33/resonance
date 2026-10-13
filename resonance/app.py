@@ -21,6 +21,7 @@ from .backend import (
     toggle_playback,
 )
 from .hub import HubWindow
+from .instance import listen
 from .player import PlayerWindow
 from .windows import prepare_window
 
@@ -44,6 +45,8 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art_image: Image.Image = render_ascii_art(None)
         self.hub: HubWindow | None = None
         self.player: PlayerWindow | None = None
+        # A second launch of Resonance asks this copy to show the hub.
+        self.instance_server = listen(lambda: self.after(0, self.open_hub))
 
         self.open_hub()
         self.poll_song()
@@ -53,8 +56,8 @@ class ResonanceApp(customtkinter.CTk):
             self.hub = HubWindow(self)
         else:
             self.hub.deiconify()
+            self.hub.focus_launcher()
         self.hub.lift()
-        self.hub.focus_force()
 
     def open_player(self) -> None:
         if self.player is None:
@@ -81,6 +84,8 @@ class ResonanceApp(customtkinter.CTk):
 
     def quit_app(self, _event: tk.Event[tk.Misc] | None = None) -> str:
         self.worker.shutdown(wait=False, cancel_futures=True)
+        if self.instance_server is not None:
+            self.instance_server.close()
         self.destroy()
         return "break"
 
