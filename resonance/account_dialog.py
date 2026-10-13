@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import time
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING, Callable
 
 import customtkinter
+from PIL import Image
 
 from .constants import (
     ACCENT_DARK,
@@ -16,13 +17,18 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
-from .user_profile import display_name, set_display_name
+from .user_profile import display_name, set_avatar, set_display_name
 from .windows import cancel_pending_after, outline_width, prepare_window
 
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
 MIN_PASSWORD_LENGTH = 8
+AVATAR_SIZE = 112
+IMAGE_TYPES = (
+    ("images", "*.png *.jpg *.jpeg *.gif *.bmp *.webp"),
+    ("all files", "*"),
+)
 
 
 def mono(size: int, weight: str = "normal") -> customtkinter.CTkFont:
@@ -165,10 +171,42 @@ class AccountDialog(customtkinter.CTkToplevel):
     def render_account(self) -> None:
         session = self.app.sync.session
         assert session is not None
-        self.heading("account")
-        self.note(f"signed in as {session.email}")
-        self.status_label = self.note("")
+        top = customtkinter.CTkFrame(self.body, fg_color="transparent")
+        top.pack(fill="x")
+        self.avatar_label = customtkinter.CTkLabel(
+            top,
+            text="",
+            width=AVATAR_SIZE,
+            height=AVATAR_SIZE,
+        )
+        self.avatar_label.pack(side="left")
+        details = customtkinter.CTkFrame(top, fg_color="transparent")
+        details.pack(side="left", fill="both", expand=True, padx=(16, 0))
+        customtkinter.CTkLabel(
+            details,
+            text="account",
+            font=mono(18, "bold"),
+            text_color=INK,
+            anchor="w",
+        ).pack(fill="x")
+        for text in (f"signed in as {session.email}", ""):
+            label = customtkinter.CTkLabel(
+                details,
+                text=text,
+                font=mono(10),
+                text_color=MUTED,
+                anchor="w",
+                justify="left",
+                wraplength=200,
+            )
+            label.pack(fill="x", pady=(2, 0))
+        self.status_label = label
         self.refresh_status()
+        picture_row = customtkinter.CTkFrame(details, fg_color="transparent")
+        picture_row.pack(anchor="w", pady=(10, 0))
+        self.button(picture_row, "choose image", self.choose_avatar, side="left")
+        self.button(picture_row, "remove", self.remove_avatar, side="left")
+        self.show_avatar()
 
         self.name_entry = self.field("display name", display_name())
         self.focus_target = self.name_entry
@@ -185,9 +223,48 @@ class AccountDialog(customtkinter.CTkToplevel):
         self.button(buttons, "sync now", self.app.sync.sync_now)
         self.button(buttons, "sign out", self.sign_out, color=ACCENT_DARK)
 
+    def show_avatar(self) -> None:
+        large, _icon = self.app.avatar_images()
+        self.avatar_image = customtkinter.CTkImage(
+            light_image=large,
+            dark_image=large,
+            size=(AVATAR_SIZE, AVATAR_SIZE),
+        )
+        self.avatar_label.configure(image=self.avatar_image)
+
+    def choose_avatar(self) -> None:
+        path = filedialog.askopenfilename(
+            parent=self,
+            title="choose a picture",
+            filetypes=IMAGE_TYPES,
+        )
+        if not path:
+            return
+        try:
+            with Image.open(path) as image:
+                set_avatar(image)
+        except OSError:
+            self.error_label.configure(
+                text="couldn't open that image",
+                text_color=ACCENT_DARK,
+            )
+            return
+        self.avatar_changed()
+
+    def remove_avatar(self) -> None:
+        set_avatar(None)
+        self.avatar_changed()
+
+    def avatar_changed(self) -> None:
+        self.error_label.configure(text="")
+        self.show_avatar()
+        self.app.profile_changed()
+
     def save_name(self) -> None:
         set_display_name(self.name_entry.get())
         self.error_label.configure(text="name saved", text_color=MUTED)
+        # The fallback avatar is the name's initial.
+        self.show_avatar()
         self.app.profile_changed()
 
     def change_password(self) -> None:

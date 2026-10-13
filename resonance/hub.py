@@ -42,6 +42,7 @@ MARGIN = 36
 SECTION_GAP = 32
 PAGES: tuple[str, ...] = ("home", "calendar")
 HUB_ART_SIZE = 144
+AVATAR_ICON_SIZE = 28
 
 
 def mono(size: int, weight: str = "normal") -> customtkinter.CTkFont:
@@ -117,6 +118,15 @@ class HubWindow(customtkinter.CTkToplevel):
             command=lambda: self.app.open_account(self),
         )
         self.account_button.pack(side="right", padx=(0, 18))
+        self.avatar_icon: customtkinter.CTkImage | None = None
+        self.avatar_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
+            header,
+            text="",
+            width=AVATAR_ICON_SIZE,
+            height=AVATAR_ICON_SIZE,
+            cursor="hand2",
+        )
+        self.avatar_label.bind("<Button-1>", lambda _event: self.app.open_account(self))
         self.show_account()
 
         add_rule(self, INK, padx=MARGIN, pady=(10, 14))
@@ -269,6 +279,19 @@ class HubWindow(customtkinter.CTkToplevel):
             text=text,
             text_color=ACCENT_DARK if problem else MUTED,
         )
+        if self.app.sync.session is None:
+            self.avatar_label.pack_forget()
+            return
+        _large, icon = self.app.avatar_images()
+        self.avatar_icon = customtkinter.CTkImage(
+            light_image=icon,
+            dark_image=icon,
+            size=(AVATAR_ICON_SIZE, AVATAR_ICON_SIZE),
+        )
+        self.avatar_label.configure(image=self.avatar_icon)
+        if self.avatar_label.winfo_manager() != "pack":
+            # Packed after the name button, so it sits just left of it.
+            self.avatar_label.pack(side="right", padx=(0, 2))
 
     def show_context_menu(self, event: tk.Event[tk.Misc]) -> None:
         self.app.show_context_menu(

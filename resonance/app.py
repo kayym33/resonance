@@ -18,7 +18,7 @@ from PIL import Image
 from . import updater
 from .about import show_about
 from .account_dialog import AccountDialog
-from .ascii_art import render_ascii_art
+from .ascii_art import render_ascii_art, render_avatar, render_avatar_icon
 from .backend import (
     SPOTIFY_REFRESH_TIME,
     get_current_song,
@@ -32,7 +32,7 @@ from .instance import listen
 from .menu import MenuItem, build_context_menu
 from .settings import load_device_setting, save_device_setting
 from .sync import SyncEngine
-from .user_profile import display_name
+from .user_profile import avatar_source, display_name, profile_data
 from .player import PlayerWindow
 from .windows import prepare_window
 
@@ -63,6 +63,7 @@ class ResonanceApp(customtkinter.CTk):
         self.context_menu: customtkinter.CTkToplevel | None = None
         self.update_check_enabled: bool = True
         self.account_dialog: AccountDialog | None = None
+        self.avatar_cache: tuple[object, Image.Image, Image.Image] | None = None
         self.sync: SyncEngine = SyncEngine(self)
         self.sync.listeners.append(self.account_changed)
         # Tk's Entry treats Ctrl+A as "go to line start"; make it select all.
@@ -142,6 +143,20 @@ class ResonanceApp(customtkinter.CTk):
         marks = {"syncing": "~", "offline": "!", "error": "!"}
         mark = marks.get(self.sync.status, "")
         return f"{name} {mark}".strip(), self.sync.status in ("offline", "error")
+
+    def avatar_images(self) -> tuple[Image.Image, Image.Image]:
+        """The profile picture as (large ASCII art, small pixel icon)."""
+        session = self.sync.session
+        initial = (display_name() or (session.email if session else "") or "~")[:1]
+        key = (profile_data().get("avatar"), initial)
+        if self.avatar_cache is None or self.avatar_cache[0] != key:
+            source = avatar_source()
+            self.avatar_cache = (
+                key,
+                render_avatar(source, initial),
+                render_avatar_icon(source, initial),
+            )
+        return self.avatar_cache[1], self.avatar_cache[2]
 
     def account_changed(self) -> None:
         if self.hub is not None:

@@ -117,10 +117,16 @@ def render_ascii_art(
     source: Image.Image | None,
     size: int = ALBUM_ART_SIZE * 2,
     seed: int | str | None = None,
+    cell: tuple[int, int] = (5, 8),
+    figure: bool = True,
 ) -> Image.Image:
-    """Redraw an image as dithered glyph noise on bone paper."""
+    """Redraw an image as dithered glyph noise on bone paper.
+
+    ``cell`` is the pixel size of one glyph; ``figure`` adds the little
+    orange figure standing in the scene.
+    """
     rng = random.Random(seed)
-    cell_width, cell_height = 5, 8
+    cell_width, cell_height = cell
     columns, rows = size // cell_width, size // cell_height
     if source is None:
         tones = landscape(columns, rows, rng.randrange(1 << 30))
@@ -158,14 +164,45 @@ def render_ascii_art(
                 fill=color,
             )
 
-    pixel = max(2, size // 60)
-    draw_figure(
-        canvas,
-        left=round(size * 0.18),
-        bottom=round(size * 0.86),
-        pixel=pixel,
-    )
+    if figure:
+        draw_figure(
+            canvas,
+            left=round(size * 0.18),
+            bottom=round(size * 0.86),
+            pixel=max(2, size // 60),
+        )
     return canvas
+
+
+def initial_portrait(initial: str, size: int = 96) -> Image.Image:
+    """A greyscale card with one big letter, for people without a picture."""
+    image = Image.new("L", (size, size), 255)
+    draw = ImageDraw.Draw(image)
+    font = load_glyph_font(round(size * 0.8))
+    draw.text(
+        (size / 2, size / 2),
+        (initial or "~")[0].lower(),
+        font=font,
+        fill=0,
+        anchor="mm",
+    )
+    return image
+
+
+def render_avatar(
+    source: Image.Image | None,
+    initial: str,
+    size: int = 192,
+) -> Image.Image:
+    """A profile picture in the same dithered style, without the figure."""
+    portrait = source if source is not None else initial_portrait(initial)
+    return render_ascii_art(
+        portrait,
+        size=size,
+        seed=initial,
+        cell=(4, 6),
+        figure=False,
+    )
 
 
 def noise_line(length: int, rng: random.Random | None = None) -> str:
@@ -179,3 +216,37 @@ def drift_noise(line: str, amount: float, rng: random.Random) -> str:
     for _ in range(max(1, round(len(characters) * amount))):
         characters[rng.randrange(len(characters))] = rng.choice(NOISE_GLYPHS)
     return "".join(characters)
+
+
+# Ordered-dither thresholds for a 4x4 tile, scaled to 0-255.
+BAYER_4 = (
+    (0, 8, 2, 10),
+    (12, 4, 14, 6),
+    (3, 11, 1, 9),
+    (15, 7, 13, 5),
+)
+
+
+def render_avatar_icon(
+    source: Image.Image | None,
+    initial: str,
+    grid: int = 14,
+    pixel: int = 4,
+) -> Image.Image:
+    """A tiny pixel-art version for places too small for glyphs."""
+    portrait = source if source is not None else initial_portrait(initial)
+    tones = ImageOps.autocontrast(
+        ImageOps.fit(portrait.convert("L"), (grid, grid)),
+        cutoff=2,
+    )
+    icon = Image.new("RGB", (grid * pixel, grid * pixel), BACKGROUND)
+    draw = ImageDraw.Draw(icon)
+    for y in range(grid):
+        for x in range(grid):
+            threshold = (BAYER_4[y % 4][x % 4] + 0.5) * 16
+            if tones.getpixel((x, y)) < threshold:
+                draw.rectangle(
+                    (x * pixel, y * pixel, (x + 1) * pixel - 1, (y + 1) * pixel - 1),
+                    fill=INK,
+                )
+    return icon

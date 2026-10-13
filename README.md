@@ -71,10 +71,14 @@ app's redirect URIs must include `http://127.0.0.1:8888/callback` exactly
 ## Accounts and sync
 
 Sign in to keep your to-dos, calendar, weather location, launcher commands
-and display name the same on every computer. t1ld3 offers to sign you in the
+and profile (display name and picture) the same on every computer. t1ld3 offers to sign you in the
 first time it starts. Later, click the name (or **sign in**) at the top right
 of the hub, right-click and choose **Account**, or type `account` in the
 launcher.
+
+In the account window, **choose image** sets your profile picture. It's
+redrawn as ASCII art, and as a small pixel icon next to your name in the hub.
+Without a picture, you get your initial.
 
 Accounts are invite-only. **Owner:** create them in the Supabase dashboard
 under **Authentication → Users → Add user**, and keep **Allow new users to
