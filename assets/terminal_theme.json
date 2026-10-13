@@ -98,6 +98,11 @@
     "text_color": [
       "#111210",
       "#111210"
+    ],
+    "border_width": 0,
+    "border_color": [
+      "#111210",
+      "#111210"
     ]
   },
   "CTkEntry": {
@@ -138,6 +143,14 @@
     "text_color": [
       "#111210",
       "#111210"
+    ],
+    "checkmark_color": [
+      "#E7E7DD",
+      "#E7E7DD"
+    ],
+    "text_color_disabled": [
+      "#A6A79B",
+      "#A6A79B"
     ]
   },
   "CTkSlider": {
@@ -158,7 +171,9 @@
     "button_hover_color": [
       "#B44718",
       "#B44718"
-    ]
+    ],
+    "corner_radius": 0,
+    "border_width": 6
   },
   "CTkProgressBar": {
     "corner_radius": 0,
@@ -193,6 +208,10 @@
     "text_color": [
       "#E7E7DD",
       "#E7E7DD"
+    ],
+    "text_color_disabled": [
+      "#A6A79B",
+      "#A6A79B"
     ]
   },
   "CTkComboBox": {
@@ -217,6 +236,10 @@
     "text_color": [
       "#111210",
       "#111210"
+    ],
+    "text_color_disabled": [
+      "#A6A79B",
+      "#A6A79B"
     ]
   },
   "CTkScrollbar": {
@@ -232,7 +255,8 @@
     "button_hover_color": [
       "#A6A79B",
       "#A6A79B"
-    ]
+    ],
+    "border_spacing": 4
   },
   "CTkSegmentedButton": {
     "corner_radius": 0,
@@ -259,6 +283,11 @@
     "text_color": [
       "#111210",
       "#111210"
+    ],
+    "border_width": 2,
+    "text_color_disabled": [
+      "#A6A79B",
+      "#A6A79B"
     ]
   },
   "CTkTabview": {
@@ -310,6 +339,60 @@
     "text_color": [
       "#111210",
       "#111210"
+    ]
+  },
+  "CTkSwitch": {
+    "corner_radius": 0,
+    "border_width": 3,
+    "button_length": 0,
+    "fg_color": [
+      "#CBCBBF",
+      "#CBCBBF"
+    ],
+    "progress_color": [
+      "#111210",
+      "#111210"
+    ],
+    "button_color": [
+      "#E8642C",
+      "#E8642C"
+    ],
+    "button_hover_color": [
+      "#B44718",
+      "#B44718"
+    ],
+    "text_color": [
+      "#111210",
+      "#111210"
+    ],
+    "text_color_disabled": [
+      "#A6A79B",
+      "#A6A79B"
+    ]
+  },
+  "CTkRadioButton": {
+    "corner_radius": 0,
+    "border_width_checked": 6,
+    "border_width_unchecked": 2,
+    "fg_color": [
+      "#111210",
+      "#111210"
+    ],
+    "border_color": [
+      "#3B3C37",
+      "#3B3C37"
+    ],
+    "hover_color": [
+      "#3B3C37",
+      "#3B3C37"
+    ],
+    "text_color": [
+      "#111210",
+      "#111210"
+    ],
+    "text_color_disabled": [
+      "#A6A79B",
+      "#A6A79B"
     ]
   }
 }

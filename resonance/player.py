@@ -51,11 +51,11 @@ class PlayerWindow(customtkinter.CTkToplevel):
     def __init__(self, app: ResonanceApp) -> None:
         super().__init__(app)
         self.app: ResonanceApp = app
-        self.size_var: tk.StringVar = tk.StringVar(value="100")
-        self.current_size_name: str = "100"
+        self.size_var: tk.StringVar = tk.StringVar(value=app.size_name)
+        self.current_size_name: str = app.size_name
         self.smallest_size_name: str = next(iter(APP_SIZES))
         self.controls_visible: bool = True
-        self.geometry(APP_SIZES["100"][0])
+        self.geometry(APP_SIZES[app.size_name][0])
         self.resizable(False, False)
         self.title("Resonance")
         self.attributes("-topmost", True)
@@ -418,12 +418,8 @@ class PlayerWindow(customtkinter.CTkToplevel):
         menu.overrideredirect(True)
         menu.attributes("-topmost", True)
         menu.configure(fg_color=BACKGROUND)
-        _, scaling = APP_SIZES[self.current_size_name]
-        menu_width = round(320 / scaling)
-        menu_height = round(408 / scaling)
-        menu.geometry(
-            f"{menu_width}x{menu_height}+{event.x_root}+{event.y_root}"
-        )
+        # CTk scales the size but not the position, which is in screen pixels.
+        menu.geometry(f"320x372+{event.x_root}+{event.y_root}")
         menu.bind("<Escape>", lambda _: self.close_context_menu())
         menu.focus_force()
 
@@ -608,6 +604,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
         geometry, scaling = size
         self.size_var.set(size_name)
         self.current_size_name = size_name
+        self.app.size_name = size_name
         customtkinter.set_widget_scaling(scaling)
         customtkinter.set_window_scaling(scaling)
         self.geometry(geometry)

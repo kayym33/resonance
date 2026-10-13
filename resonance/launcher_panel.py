@@ -83,7 +83,7 @@ class LauncherPanel(customtkinter.CTkFrame):
             border_width=0,
             fg_color=BACKGROUND,
             text_color=INK,
-            placeholder_text="zen, term, p resonance, play ..., = 12*7",
+            placeholder_text="zen, p resonance, play ..., todo ..., = 12*7",
             placeholder_text_color=MUTED,
             font=mono(14),
         )
@@ -253,6 +253,11 @@ class LauncherPanel(customtkinter.CTkFrame):
                 suggestion.args,
             )
             future.add_done_callback(self.play_request_finished)
+        elif suggestion.kind == "todo":
+            hub = self.app.hub
+            if hub is not None:
+                hub.todo_panel.add_task(suggestion.args)
+                self.show_status(f"added: {suggestion.args}")
         elif suggestion.args == "player":
             self.app.open_player()
         elif suggestion.args == "quit":

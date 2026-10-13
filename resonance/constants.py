@@ -26,13 +26,19 @@ ACCENT = "#E8642C"
 ACCENT_DARK = "#B44718"
 ALBUM_ART_SIZE = 168
 MONO_FONT = "Consolas" if os.name == "nt" else "DejaVu Sans Mono"
+# Base zoom applied on top of every size preset.
+UI_SCALE: float = 4 / 3
+DEFAULT_SIZE = "100"
 APP_SIZES: dict[str, tuple[str, float]] = {
-    "80": ("300x550", 0.9),
-    "90": ("320x528", 1.0),
-    "100": ("340x548", 1.0),
-    "110": ("350x523", 1.1),
-    "120": ("375x548", 1.2),
-    "130": ("410x598", 1.3),
+    name: (geometry, round(scaling * UI_SCALE, 3))
+    for name, (geometry, scaling) in {
+        "80": ("300x550", 0.9),
+        "90": ("320x528", 1.0),
+        "100": ("340x548", 1.0),
+        "110": ("350x523", 1.1),
+        "120": ("375x548", 1.2),
+        "130": ("410x598", 1.3),
+    }.items()
 }
 
 

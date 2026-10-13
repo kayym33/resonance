@@ -19,6 +19,7 @@ from .constants import (
     MUTED,
 )
 from .launcher_panel import LauncherPanel
+from .todo_panel import TodoPanel
 from .weather_panel import WeatherPanel
 from .windows import (
     add_rule,
@@ -30,7 +31,8 @@ from .windows import (
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
-HUB_GEOMETRY = "620x500"
+HUB_GEOMETRY = "760x590"
+WEATHER_COLUMN_WIDTH = 330
 HUB_ART_SIZE = 144
 
 
@@ -115,7 +117,7 @@ class HubWindow(customtkinter.CTkToplevel):
             text_color=INK,
             anchor="w",
             justify="left",
-            wraplength=380,
+            wraplength=500,
         )
         self.song_label.pack(fill="x", pady=(8, 0))
         self.artist_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
@@ -167,8 +169,22 @@ class HubWindow(customtkinter.CTkToplevel):
             ),
         ]
 
-        self.weather_panel: WeatherPanel = WeatherPanel(self, self.app)
-        self.weather_panel.pack(fill="x", padx=24, pady=(28, 0))
+        columns = customtkinter.CTkFrame(self, fg_color="transparent")
+        columns.pack(fill="x", padx=24, pady=(28, 0))
+        weather_column = customtkinter.CTkFrame(
+            columns,
+            width=WEATHER_COLUMN_WIDTH,
+            fg_color="transparent",
+        )
+        weather_column.pack(side="left", fill="y")
+        weather_column.pack_propagate(False)
+        self.weather_panel: WeatherPanel = WeatherPanel(
+            weather_column,
+            self.app,
+        )
+        self.weather_panel.pack(fill="x")
+        self.todo_panel: TodoPanel = TodoPanel(columns)
+        self.todo_panel.pack(side="left", fill="both", expand=True, padx=(24, 0))
 
         self.set_album_art(self.app.album_art_image)
         if self.app.song is not None:
@@ -212,6 +228,7 @@ class HubWindow(customtkinter.CTkToplevel):
         for button in self.outlined_buttons:
             button.configure(border_width=outline_width(self))
         self.weather_panel.refresh_outlines()
+        self.todo_panel.refresh_outlines()
         self.launcher.refresh_outlines()
 
     def update_time(self) -> None:

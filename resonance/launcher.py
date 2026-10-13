@@ -77,6 +77,7 @@ DEFAULT_COMMANDS["yt"] = {
 BUILTINS: dict[str, str] = {
     "player": "pop out the player",
     "play": "play a song on Spotify",
+    "todo": "add a to-do",
     "quit": "quit Resonance",
 }
 
@@ -98,8 +99,8 @@ class Suggestion:
     """One row in the launcher list.
 
     ``kind`` is "run" (start ``command`` with ``args``), "builtin" (app
-    action named by ``args``), "play" (Spotify search for ``args``) or
-    "calc" (``args`` is the result).
+    action named by ``args``), "play" (Spotify search for ``args``),
+    "todo" (add ``args`` as a task) or "calc" (``args`` is the result).
     """
 
     title: str
@@ -221,6 +222,16 @@ def suggest(text: str, commands: list[Command]) -> list[Suggestion]:
                     args,
                 )
             ]
+        if word == "todo":
+            return [
+                Suggestion(
+                    f"todo {args}" if args else "todo",
+                    "add to your list" if args else "type a task",
+                    text,
+                    "todo" if args else "none",
+                    args,
+                )
+            ]
         for command in commands:
             if word in command.names():
                 return argument_suggestions(command, word, args)
@@ -253,7 +264,7 @@ def suggest(text: str, commands: list[Command]) -> list[Suggestion]:
                         name,
                         description,
                         f"{name} ",
-                        "builtin" if name != "play" else "none",
+                        "none" if name in ("play", "todo") else "builtin",
                         name,
                     ),
                 )

@@ -20,6 +20,7 @@ from .backend import (
     previous_song,
     toggle_playback,
 )
+from .constants import APP_SIZES, DEFAULT_SIZE
 from .hub import HubWindow
 from .instance import listen
 from .player import PlayerWindow
@@ -45,6 +46,8 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art_image: Image.Image = render_ascii_art(None)
         self.hub: HubWindow | None = None
         self.player: PlayerWindow | None = None
+        # Size preset chosen in the player; the zoom it sets is app-wide.
+        self.size_name: str = DEFAULT_SIZE
         # Tk's Entry treats Ctrl+A as "go to line start"; make it select all.
         self.bind_class("Entry", "<Control-a>", self.select_all)
         # A second launch of Resonance asks this copy to show the hub.
@@ -196,6 +199,9 @@ class ResonanceApp(customtkinter.CTk):
 
 def create_app() -> ResonanceApp:
     customtkinter.set_appearance_mode("light")
+    _, scaling = APP_SIZES[DEFAULT_SIZE]
+    customtkinter.set_widget_scaling(scaling)
+    customtkinter.set_window_scaling(scaling)
     theme_path = (
         Path(__file__).resolve().parents[1] / "assets" / "terminal_theme.json"
     )
