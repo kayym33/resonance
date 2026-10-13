@@ -10,6 +10,7 @@ from PIL import Image
 from .ascii_art import drift_noise, noise_line
 from .backend import REFRESH_TIME, get_time
 from .constants import (
+    APP_NAME,
     BACKGROUND,
     FAINT,
     HOVER,
@@ -46,7 +47,7 @@ class HubWindow(customtkinter.CTkToplevel):
     def __init__(self, app: ResonanceApp) -> None:
         super().__init__(app)
         self.app: ResonanceApp = app
-        self.title("Resonance")
+        self.title(APP_NAME)
         self.geometry(HUB_GEOMETRY)
         self.resizable(False, False)
         self.configure(fg_color=BACKGROUND)
@@ -70,7 +71,7 @@ class HubWindow(customtkinter.CTkToplevel):
         header.pack(fill="x", padx=24, pady=(4, 0))
         customtkinter.CTkLabel(
             header,
-            text="RESONANCE",
+            text=APP_NAME,
             font=mono(15, "bold"),
             text_color=INK,
         ).pack(side="left")

@@ -26,6 +26,7 @@ from .constants import (
     ALBUM_ART_SIZE,
     APP_AUTHOR,
     APP_EMAIL,
+    APP_NAME,
     APP_REPOSITORY,
     APP_SIZES,
     APP_VERSION,
@@ -57,7 +58,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.controls_visible: bool = True
         self.geometry(APP_SIZES[app.size_name][0])
         self.resizable(False, False)
-        self.title("Resonance")
+        self.title(APP_NAME)
         self.attributes("-topmost", True)
         self.configure(fg_color=BACKGROUND)
         self.protocol("WM_DELETE_WINDOW", self.close_window)
@@ -434,7 +435,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
 
         title = customtkinter.CTkLabel(
             frame,
-            text="  RESONANCE",
+            text=f"  {APP_NAME}",
             anchor="w",
             text_color=INK,
             font=customtkinter.CTkFont(family=MONO_FONT, size=11, weight="bold"),
@@ -485,11 +486,11 @@ class PlayerWindow(customtkinter.CTkToplevel):
         )
         if not self.update_check_enabled:
             update_button.configure(state="disabled")
-        self.add_menu_button(frame, "About Resonance", self.show_about)
+        self.add_menu_button(frame, f"About {APP_NAME}", self.show_about)
         self.add_menu_button(frame, "Close player", self.close_window)
         self.add_menu_button(
             frame,
-            "Quit Resonance",
+            f"Quit {APP_NAME}",
             self.app.quit_app,
             text_color=ACCENT_DARK,
         )
@@ -540,7 +541,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
 
     def show_about(self) -> None:
         dialog = customtkinter.CTkToplevel(self)
-        dialog.title("About Resonance")
+        dialog.title(f"About {APP_NAME}")
         dialog.geometry("330x285")
         dialog.resizable(False, False)
         dialog.transient(self)
@@ -557,7 +558,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
         card.pack(fill="both", expand=True, padx=8, pady=8)
         customtkinter.CTkLabel(
             card,
-            text="Resonance",
+            text=APP_NAME,
             text_color=INK,
             font=customtkinter.CTkFont(family=MONO_FONT, size=22, weight="bold"),
         ).pack(pady=(22, 2))
@@ -731,7 +732,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
         ):
             messagebox.showinfo(
                 "Updates",
-                f"Resonance {APP_VERSION} is up to date.",
+                f"{APP_NAME} {APP_VERSION} is up to date.",
                 parent=self,
             )
             return
@@ -739,7 +740,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
         tag_name, download_url = update
         if messagebox.askyesno(
             "Update available",
-            f"Resonance {tag_name} is available. Download and install it now?",
+            f"{APP_NAME} {tag_name} is available. Download and install it now?",
             parent=self,
         ):
             self.app.worker.submit(

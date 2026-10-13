@@ -92,17 +92,25 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          pyinstaller --clean --onefile --windowed --name Resonance `
+          pyinstaller --clean --onefile --windowed --name t1ld3 `
             --icon=assets\icon.ico `
             --add-data "assets\terminal_theme.json;assets" `
             --add-data "assets\icon.ico;assets" `
             --add-data "assets\quotes.json;assets" `
             main.py
 
+      - name: Add copy for pre-rename updaters
+        shell: pwsh
+        run: Copy-Item dist\t1ld3.exe dist\Resonance.exe
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.NEXT_TAG }}
-          name: Resonance ${{ env.NEXT_TAG }}
-          files: dist/Resonance.exe
+          name: t1ld3 ${{ env.NEXT_TAG }}
+          # Resonance.exe is the same build under the pre-rename name, so
+          # installed copies of Resonance can still find and apply updates.
+          files: |
+            dist/t1ld3.exe
+            dist/Resonance.exe
           generate_release_notes: true

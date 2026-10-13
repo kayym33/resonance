@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote_plus
 
+from .constants import APP_NAME
 from .setup import CONFIG_PATH
 
 COMMANDS_PATH = CONFIG_PATH.with_name("commands.json")
@@ -78,7 +79,7 @@ BUILTINS: dict[str, str] = {
     "player": "pop out the player",
     "play": "play a song on Spotify",
     "todo": "add a to-do",
-    "quit": "quit Resonance",
+    "quit": f"quit {APP_NAME}",
 }
 
 

@@ -1,6 +1,6 @@
-# Resonance
+# t1ld3
 
-Resonance is a small Windows desktop companion for Spotify. It shows the
+t1ld3 is a small Windows desktop companion for Spotify. It shows the
 currently playing track in a compact window and gives you quick playback
 controls without opening the full Spotify window.
 
@@ -25,7 +25,7 @@ controls without opening the full Spotify window.
 
 ## First-time setup
 
-Before opening Resonance, create a Spotify developer application:
+Before opening t1ld3, create a Spotify developer application:
 
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
    and sign in.
@@ -41,18 +41,18 @@ Before opening Resonance, create a Spotify developer application:
 4. Copy the application's **Client ID** and **Client Secret**. Keep the
    secret private.
 
-## Start Resonance
+## Start t1ld3
 
 ### Using the Windows executable
 
-The included `Resonance.exe` is for Windows. Double-click it to start the
+The included `t1ld3.exe` is for Windows. Double-click it to start the
 application. If Windows displays a security warning, verify that the file came
 from the person or location you trust before choosing **Run**.
 
 ### Using the Python version on Windows
 
 If you received the source-code version instead of the executable, install
-Python 3.10 or newer, open PowerShell in the Resonance folder, and run:
+Python 3.10 or newer, open PowerShell in the t1ld3 folder, and run:
 
 ```powershell
 py -m pip install spotipy customtkinter pillow
@@ -69,7 +69,7 @@ sudo apt update
 sudo apt install python3 python3-pip python3-venv python3-tk
 ```
 
-Then, from the Resonance folder, create an environment and start the app:
+Then, from the t1ld3 folder, create an environment and start the app:
 
 ```bash
 python3 -m venv .venv
@@ -87,17 +87,17 @@ request is merged into `main`, GitHub Actions automatically:
 
 1. Increments the patch version, such as `0.1.1` to `0.1.2`.
 2. Commits the new `APP_VERSION` back to `main`.
-3. Builds `Resonance.exe` on a Windows runner.
+3. Builds `t1ld3.exe` on a Windows runner.
 4. Creates a matching GitHub Release, such as `v0.1.2`.
 
 Users can then right-click the Windows app and choose **Check for updates**.
-After they confirm, Resonance downloads the new executable, closes, replaces
+After they confirm, t1ld3 downloads the new executable, closes, replaces
 it, and starts the updated version. Updates are downloaded only after the user
 confirms the prompt.
 
 ## Connect your Spotify account
 
-The first time Resonance starts, it asks for:
+The first time t1ld3 starts, it asks for:
 
 - **Spotify Client ID** — from your Spotify developer application.
 - **Spotify Client Secret** — from the same application.
@@ -108,7 +108,7 @@ The first time Resonance starts, it asks for:
   ```
 
 Choose **Save and continue**, then approve access in the browser window that
-opens. Return to Resonance after authorization.
+opens. Return to t1ld3 after authorization.
 
 If your Spotify application is in Development mode, the Spotify account you
 use must be added as a test user in the application's dashboard.
@@ -123,9 +123,9 @@ use must be added as a test user in the application's dashboard.
 | Playback position | Drag the progress slider |
 | Volume | Drag the volume slider |
 | More options | Right-click anywhere in the window |
-| About Resonance | Right-click, then select **About Resonance** |
+| About t1ld3 | Right-click, then select **About t1ld3** |
 | Change size | Right-click, then choose **Size** and select **Small**, **Medium**, or **Large** |
-| Close Resonance | Use the window close button, **Exit**, `Ctrl+Q`, or `Escape` |
+| Close t1ld3 | Use the window close button, **Exit**, `Ctrl+Q`, or `Escape` |
 
 Playback controls work only when Spotify Premium is active and Spotify has an
 available playback device. Open Spotify, select a device, and try again if
@@ -136,17 +136,17 @@ reveal the playback buttons.
 
 ## Your credentials and privacy
 
-Resonance stores the Spotify application details locally on your computer at:
+t1ld3 stores the Spotify application details locally on your computer at:
 
 ```text
-%LOCALAPPDATA%\Resonance\spotify.json
+%LOCALAPPDATA%\t1ld3\spotify.json
 ```
 
 The application uses Spotify authorization to access your playback
 information. It does not include your credentials in the executable.
 
 Never share your Spotify Client Secret or authorization cache. If you are
-using a copy of Resonance from someone else, create and use your own Spotify
+using a copy of t1ld3 from someone else, create and use your own Spotify
 developer application.
 
 ## Troubleshooting
@@ -182,11 +182,11 @@ track changes.
 
 ### Start over with a different Spotify account
 
-Close Resonance and delete this file:
+Close t1ld3 and delete this file:
 
 ```text
-%LOCALAPPDATA%\Resonance\spotify.json
+%LOCALAPPDATA%\t1ld3\spotify.json
 ```
 
-Start Resonance again and enter the credentials for the Spotify developer
+Start t1ld3 again and enter the credentials for the Spotify developer
 application you want to use.

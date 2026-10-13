@@ -7,6 +7,7 @@ from typing import Any
 
 
 QUOTES_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "quotes.json"
+APP_NAME = "t1ld3"
 APP_VERSION = "0.1.5"
 APP_AUTHOR = "kayla"
 APP_EMAIL = "kayla.mcdade.2023@uni.strath.ac.uk"

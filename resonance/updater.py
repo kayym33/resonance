@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
 
-from .constants import GITHUB_RELEASES_API
+from .constants import APP_NAME, GITHUB_RELEASES_API
+
+# Releases from before the rename only have Resonance.exe.
+ASSET_NAMES = (f"{APP_NAME}.exe", "Resonance.exe")
 
 
 def parse_version(version: str) -> tuple[int, ...]:
@@ -33,18 +36,20 @@ def find_update() -> tuple[str, str] | None:
     if not isinstance(tag_name, str) or not isinstance(assets, list):
         raise ValueError("GitHub release is missing version or assets")
 
-    for asset in assets:
-        if (
-            isinstance(asset, dict)
-            and asset.get("name") == "Resonance.exe"
-            and isinstance(asset.get("browser_download_url"), str)
-        ):
-            return tag_name, asset["browser_download_url"]
-    raise ValueError("The latest release does not contain Resonance.exe")
+    download_urls = {
+        asset.get("name"): asset.get("browser_download_url")
+        for asset in assets
+        if isinstance(asset, dict)
+        and isinstance(asset.get("browser_download_url"), str)
+    }
+    for name in ASSET_NAMES:
+        if name in download_urls:
+            return tag_name, download_urls[name]
+    raise ValueError(f"The latest release does not contain {ASSET_NAMES[0]}")
 
 
 def download_update(download_url: str) -> Path:
-    download_path = Path(tempfile.gettempdir()) / "Resonance-update.exe"
+    download_path = Path(tempfile.gettempdir()) / f"{APP_NAME}-update.exe"
     request = Request(
         download_url,
         headers={"Accept": "application/octet-stream"},
@@ -57,7 +62,7 @@ def download_update(download_url: str) -> Path:
 
 def install_update(download_path: Path) -> None:
     current_exe = Path(sys.executable).resolve()
-    updater_path = Path(tempfile.gettempdir()) / "Resonance-updater.bat"
+    updater_path = Path(tempfile.gettempdir()) / f"{APP_NAME}-updater.bat"
     updater_path.write_text(
         "@echo off\r\n"
         "set attempts=0\r\n"

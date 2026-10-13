@@ -23,7 +23,7 @@ def prepare_window(window: tk.Wm | tk.Misc) -> None:
 
 
 def configure_taskbar_presence(window: tk.Misc) -> None:
-    # Remove the tool-window style so Windows groups Resonance in the taskbar.
+    # Remove the tool-window style so Windows groups the app in the taskbar.
     hwnd: int = window.winfo_id()
     get_window_long = ctypes.windll.user32.GetWindowLongW
     set_window_long = ctypes.windll.user32.SetWindowLongW

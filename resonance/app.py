@@ -20,7 +20,7 @@ from .backend import (
     previous_song,
     toggle_playback,
 )
-from .constants import APP_SIZES, DEFAULT_SIZE
+from .constants import APP_NAME, APP_SIZES, DEFAULT_SIZE
 from .hub import HubWindow
 from .instance import listen
 from .player import PlayerWindow
@@ -37,7 +37,7 @@ class ResonanceApp(customtkinter.CTk):
     def __init__(self) -> None:
         super().__init__()
         self.withdraw()
-        self.title("Resonance")
+        self.title(APP_NAME)
         prepare_window(self)
         self.worker: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=2)
         self.song: dict[str, Any] | None = None
@@ -50,7 +50,7 @@ class ResonanceApp(customtkinter.CTk):
         self.size_name: str = DEFAULT_SIZE
         # Tk's Entry treats Ctrl+A as "go to line start"; make it select all.
         self.bind_class("Entry", "<Control-a>", self.select_all)
-        # A second launch of Resonance asks this copy to show the hub.
+        # A second launch of the app asks this copy to show the hub.
         self.instance_server = listen(lambda: self.after(0, self.open_hub))
 
         self.open_hub()
@@ -208,6 +208,6 @@ def create_app() -> ResonanceApp:
     customtkinter.set_default_color_theme(str(theme_path))
     if os.name == "nt":
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "resonance.app"
+            f"{APP_NAME}.app"
         )
     return ResonanceApp()

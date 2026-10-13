@@ -2,17 +2,28 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
-from .constants import BACKGROUND, INK, INK_SOFT, MONO_FONT
+from .constants import APP_NAME, BACKGROUND, INK, INK_SOFT, MONO_FONT
 
-CONFIG_PATH: Path = (
-    Path(os.environ.get("LOCALAPPDATA", Path.home()))
-    / "Resonance"
-    / "spotify.json"
-)
+DATA_ROOT: Path = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+CONFIG_PATH: Path = DATA_ROOT / APP_NAME / "spotify.json"
+# The app was called Resonance before; its settings folder moves across.
+LEGACY_CONFIG_DIR: Path = DATA_ROOT / "Resonance"
+
+
+def migrate_config_dir() -> None:
+    config_dir = CONFIG_PATH.parent
+    if config_dir.exists() or not LEGACY_CONFIG_DIR.is_dir():
+        return
+    try:
+        LEGACY_CONFIG_DIR.rename(config_dir)
+    except OSError:
+        # Renaming can fail on Windows if a file is in use; copy instead.
+        shutil.copytree(LEGACY_CONFIG_DIR, config_dir)
 
 
 def load_config() -> dict[str, str]:
@@ -40,6 +51,7 @@ def save_config(config: dict[str, str]) -> None:
 
 
 def setup_spotify() -> bool:
+    migrate_config_dir()
     environment_config: dict[str, str] = {
         "client_id": os.environ.get("SPOTIPY_CLIENT_ID", ""),
         "client_secret": os.environ.get("SPOTIPY_CLIENT_SECRET", ""),
@@ -66,7 +78,7 @@ def setup_spotify() -> bool:
         return True
 
     window = tk.Tk()
-    window.title("Resonance setup")
+    window.title(f"{APP_NAME} setup")
     window.resizable(False, False)
     window.configure(bg=BACKGROUND)
     label_style: dict[str, object] = {

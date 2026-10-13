@@ -1,4 +1,4 @@
-"""Keep Resonance to one running copy.
+"""Keep the app to one running copy.
 
 A second launch (for example from a desktop keyboard shortcut) asks the
 running copy to show its hub, then exits. Only the standard library is
@@ -13,8 +13,8 @@ import threading
 from typing import Callable
 
 PORT = 47917
-REQUEST = b"resonance:show-hub\n"
-REPLY = b"resonance:ok\n"
+REQUEST = b"t1ld3:show-hub\n"
+REPLY = b"t1ld3:ok\n"
 
 
 def notify_running_instance() -> bool:
