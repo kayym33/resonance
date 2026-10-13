@@ -6,6 +6,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
+from .constants import BACKGROUND, INK, INK_SOFT, MONO_FONT
+
 CONFIG_PATH: Path = (
     Path(os.environ.get("LOCALAPPDATA", Path.home()))
     / "Resonance"
@@ -66,6 +68,12 @@ def setup_spotify() -> bool:
     window = tk.Tk()
     window.title("Resonance setup")
     window.resizable(False, False)
+    window.configure(bg=BACKGROUND)
+    label_style: dict[str, object] = {
+        "bg": BACKGROUND,
+        "fg": INK,
+        "font": (MONO_FONT, 10),
+    }
 
     fields: dict[str, tk.Entry] = {}
     labels: tuple[tuple[str, str, str], ...] = (
@@ -83,17 +91,30 @@ def setup_spotify() -> bool:
         text="Enter your Spotify Developer credentials.",
         padx=20,
         pady=12,
+        **label_style,
     ).grid(row=0, column=0, columnspan=2)
 
     for row, (key, label, default) in enumerate(labels, start=1):
-        tk.Label(window, text=label).grid(
+        tk.Label(window, text=label, **label_style).grid(
             row=row,
             column=0,
             padx=(20, 8),
             pady=5,
             sticky="e",
         )
-        entry = tk.Entry(window, width=38, show="*" if key == "client_secret" else "")
+        entry = tk.Entry(
+            window,
+            width=38,
+            show="*" if key == "client_secret" else "",
+            bg="#F0F0E8",
+            fg=INK,
+            insertbackground=INK,
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground=INK_SOFT,
+            highlightcolor=INK,
+            font=(MONO_FONT, 10),
+        )
         entry.insert(0, config.get(key, default))
         entry.grid(row=row, column=1, padx=(0, 20), pady=5)
         fields[key] = entry
@@ -123,7 +144,20 @@ def setup_spotify() -> bool:
         result["saved"] = True
         window.destroy()
 
-    tk.Button(window, text="Save and continue", command=submit).grid(
+    tk.Button(
+        window,
+        text="Save and continue",
+        command=submit,
+        bg=INK,
+        fg=BACKGROUND,
+        activebackground=INK_SOFT,
+        activeforeground=BACKGROUND,
+        relief="flat",
+        borderwidth=0,
+        padx=14,
+        pady=6,
+        font=(MONO_FONT, 10, "bold"),
+    ).grid(
         row=4,
         column=0,
         columnspan=2,

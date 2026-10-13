@@ -94,7 +94,7 @@ jobs:
         run: |
           pyinstaller --clean --onefile --windowed --name Resonance `
             --icon=assets\icon.ico `
-            --add-data "assets\pink_theme.json;assets" `
+            --add-data "assets\terminal_theme.json;assets" `
             --add-data "assets\icon.ico;assets" `
             --add-data "assets\quotes.json;assets" `
             main.py

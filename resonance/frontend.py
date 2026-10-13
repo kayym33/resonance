@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import random
 import sys
 import time
 import tkinter as tk
@@ -26,13 +27,25 @@ from .backend import (
     set_volume,
     toggle_playback,
 )
+from .ascii_art import drift_noise, noise_line, render_ascii_art
 from .constants import (
+    ACCENT,
+    ACCENT_DARK,
+    ALBUM_ART_SIZE,
     APP_AUTHOR,
     APP_EMAIL,
     APP_REPOSITORY,
     APP_SIZES,
     APP_VERSION,
+    BACKGROUND,
+    FAINT,
+    HOVER,
+    INK,
+    INK_SOFT,
+    MONO_FONT,
+    MUTED,
     QUOTES,
+    RULE,
     MIN_LOADING_TIME
 )
 from . import updater
@@ -49,7 +62,7 @@ class ResonanceApp(customtkinter.CTk):
         self.resizable(False, False)
         self.title("Resonance")
         self.attributes("-topmost", True)
-        self.configure(fg_color="#FFF1F5")
+        self.configure(fg_color=BACKGROUND)
         self.bind("<Map>", self.restore_topmost)
         self.bind_all("<Button-3>", self.show_context_menu)
         self.bind_all("<Motion>", self.handle_pointer_motion)
@@ -84,29 +97,32 @@ class ResonanceApp(customtkinter.CTk):
         self.quote_index: int = 0
         self.context_menu: customtkinter.CTkToplevel | None = None
         self.update_check_enabled: bool = True
+        self.noise_rng: random.Random = random.Random()
+
+        self.noise_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
+            self,
+            text=noise_line(72, self.noise_rng),
+            font=customtkinter.CTkFont(family=MONO_FONT, size=8),
+            text_color=FAINT,
+            height=12,
+            anchor="center",
+        )
+        self.noise_label.pack(fill="x", pady=(6, 0))
 
         self.time_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self,
             text="",
-            font=customtkinter.CTkFont(
-                family="Segoe UI",
-                size=34,
-                weight="normal",
-            ),
-            text_color="#B84F6B",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=32),
+            text_color=INK,
             anchor="center",
         )
-        self.time_label.pack(fill="x", padx=20, pady=(16, 10))
+        self.time_label.pack(fill="x", padx=20, pady=(2, 6))
 
         self.user_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self,
             text="",
-            font=customtkinter.CTkFont(
-                family="Segoe UI",
-                size=10,
-                slant="italic",
-            ),
-            text_color="#9A5B6D",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=10),
+            text_color=MUTED,
             anchor="center",
             wraplength=260,
         )
@@ -114,10 +130,10 @@ class ResonanceApp(customtkinter.CTk):
 
         self.album_art_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self,
-            width=128,
-            height=128,
-            corner_radius=4,
-            fg_color="#FFFFFF",
+            width=ALBUM_ART_SIZE + 8,
+            height=ALBUM_ART_SIZE + 8,
+            corner_radius=0,
+            fg_color=BACKGROUND,
             border_width=0,
         )
         self.album_art_frame.pack(pady=(0, 12))
@@ -126,11 +142,12 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.album_art_frame,
             text="",
-            width=120,
-            height=120,
-            corner_radius=2,
+            width=ALBUM_ART_SIZE,
+            height=ALBUM_ART_SIZE,
+            corner_radius=0,
         )
         self.album_art_label.pack(expand=True)
+        self.set_album_art(render_ascii_art(None))
 
         self.track_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self,
@@ -155,8 +172,8 @@ class ResonanceApp(customtkinter.CTk):
         self.song_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.title_viewport,
             text="Checking Spotify...",
-            font=customtkinter.CTkFont(family="Arial", size=18, weight="bold"),
-            text_color="#6F3044",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=16, weight="bold"),
+            text_color=INK,
             anchor="center",
             justify="center",
             wraplength=260,
@@ -166,8 +183,8 @@ class ResonanceApp(customtkinter.CTk):
         self.artist_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.track_text_frame,
             text="",
-            font=customtkinter.CTkFont(family="Arial", size=13),
-            text_color="#9A5B6D",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=12),
+            text_color=INK_SOFT,
             anchor="center",
         )
         self.artist_label.pack(fill="x", pady=(3, 0))
@@ -175,8 +192,8 @@ class ResonanceApp(customtkinter.CTk):
         self.track_meta_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.track_text_frame,
             text="",
-            font=customtkinter.CTkFont(family="Arial", size=10),
-            text_color="#B07182",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=10),
+            text_color=MUTED,
             anchor="center",
         )
         self.track_meta_label.pack(fill="x", pady=(2, 0))
@@ -190,8 +207,8 @@ class ResonanceApp(customtkinter.CTk):
         self.progress_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.progress_frame,
             text="0:00 / 0:00",
-            font=customtkinter.CTkFont(family="Arial", size=10),
-            text_color="#9A5B6D",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=10),
+            text_color=MUTED,
             anchor="center",
         )
         self.progress_label.pack(fill="x", pady=(0, 3))
@@ -201,15 +218,15 @@ class ResonanceApp(customtkinter.CTk):
             from_=0,
             to=1,
             number_of_steps=1000,
-            height=12,
-            corner_radius=6,
+            height=10,
+            corner_radius=0,
             border_width=0,
-            button_length=12,
-            button_corner_radius=6,
-            progress_color="#E05A7A",
-            fg_color="#F0B1C0",
-            button_color="#D8758F",
-            button_hover_color="#C96B86",
+            button_length=4,
+            button_corner_radius=0,
+            progress_color=INK,
+            fg_color=RULE,
+            button_color=ACCENT,
+            button_hover_color=ACCENT_DARK,
             command=self.change_playback_position,
         )
         self.progress_bar.set(0)
@@ -223,9 +240,9 @@ class ResonanceApp(customtkinter.CTk):
 
         self.volume_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.volume_frame,
-            text="Volume",
-            font=customtkinter.CTkFont(family="Arial", size=10),
-            text_color="#9A5B6D",
+            text="vol",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=10),
+            text_color=MUTED,
             anchor="w",
         )
         self.volume_label.pack(side="left", padx=(0, 8))
@@ -235,13 +252,15 @@ class ResonanceApp(customtkinter.CTk):
             from_=0,
             to=100,
             number_of_steps=100,
-            height=12,
-            corner_radius=6,
+            height=10,
+            corner_radius=0,
             border_width=0,
-            button_length=12,
-            progress_color="#E05A7A",
-            button_color="#D8758F",
-            button_hover_color="#C96B86",
+            button_length=4,
+            button_corner_radius=0,
+            progress_color=INK,
+            fg_color=RULE,
+            button_color=ACCENT,
+            button_hover_color=ACCENT_DARK,
             command=self.change_volume,
         )
         self.volume_slider.set(0)
@@ -263,46 +282,54 @@ class ResonanceApp(customtkinter.CTk):
 
         self.previous_button: customtkinter.CTkButton = customtkinter.CTkButton(
             self.controls_frame,
-            text="⏮",
+            text="|<",
             width=70,
             height=44,
-            corner_radius=8,
-            fg_color="#E58AA0",
-            hover_color="#D8758F",
-            font=customtkinter.CTkFont(size=21),
+            corner_radius=0,
+            border_width=self.outline_width(),
+            border_color=INK,
+            fg_color="transparent",
+            hover_color=HOVER,
+            text_color=INK,
+            font=customtkinter.CTkFont(family=MONO_FONT, size=16, weight="bold"),
             command=self.previous_song,
         )
         self.previous_button.pack(side="left", expand=True, padx=5)
 
         self.play_pause_button: customtkinter.CTkButton = customtkinter.CTkButton(
             self.controls_frame,
-            text="▶",
+            text=">",
             width=80,
             height=48,
-            corner_radius=8,
-            fg_color="#D8758F",
-            hover_color="#C96B86",
-            font=customtkinter.CTkFont(size=23, weight="bold"),
+            corner_radius=0,
+            border_width=0,
+            fg_color=INK,
+            hover_color=INK_SOFT,
+            text_color=BACKGROUND,
+            font=customtkinter.CTkFont(family=MONO_FONT, size=18, weight="bold"),
             command=self.toggle_playback,
         )
         self.play_pause_button.pack(side="left", expand=True, padx=5)
 
         self.next_button: customtkinter.CTkButton = customtkinter.CTkButton(
             self.controls_frame,
-            text="⏭",
+            text=">|",
             width=70,
             height=44,
-            corner_radius=8,
-            fg_color="#E58AA0",
-            hover_color="#D8758F",
-            font=customtkinter.CTkFont(size=21),
+            corner_radius=0,
+            border_width=self.outline_width(),
+            border_color=INK,
+            fg_color="transparent",
+            hover_color=HOVER,
+            text_color=INK,
+            font=customtkinter.CTkFont(family=MONO_FONT, size=16, weight="bold"),
             command=self.next_song,
         )
         self.next_button.pack(side="left", expand=True, padx=5)
 
         self.loading_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self,
-            fg_color="#FFF1F5",
+            fg_color=BACKGROUND,
             corner_radius=0,
         )
         self.loading_frame.place(
@@ -314,34 +341,26 @@ class ResonanceApp(customtkinter.CTk):
         self.loading_title: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.loading_frame,
             text="Connecting to Spotify...",
-            font=customtkinter.CTkFont(
-                family="Segoe UI",
-                size=24,
-                weight="bold",
-            ),
-            text_color="#B84F6B",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=17, weight="bold"),
+            text_color=INK,
         )
         self.loading_title.place(relx=0.5, rely=0.46, anchor="center")
         self.loading_status: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self.loading_frame,
             text="Just a moment ♡",
-            font=customtkinter.CTkFont(
-                family="Segoe UI",
-                size=12,
-                slant="italic",
-            ),
-            text_color="#9A5B6D",
+            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
+            text_color=MUTED,
         )
         self.loading_status.place(relx=0.5, rely=0.54, anchor="center")
         self.loading_progress: customtkinter.CTkProgressBar = (
             customtkinter.CTkProgressBar(
                 self.loading_frame,
                 width=190,
-                height=10,
-                corner_radius=5,
+                height=8,
+                corner_radius=0,
                 border_width=0,
-                progress_color="#E05A7A",
-                fg_color="#F0B1C0",
+                progress_color=INK,
+                fg_color=RULE,
             )
         )
         self.loading_progress.set(0)
@@ -349,6 +368,7 @@ class ResonanceApp(customtkinter.CTk):
         self.animate_loading_progress()
 
         self.update_time()
+        self.update_noise()
         self.update_quote()
         self.update_song()
         self.update_progress()
@@ -358,6 +378,12 @@ class ResonanceApp(customtkinter.CTk):
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
         self.after(REFRESH_TIME * 1000, self.update_time)
+
+    def update_noise(self) -> None:
+        self.noise_label.configure(
+            text=drift_noise(self.noise_label.cget("text"), 0.05, self.noise_rng)
+        )
+        self.after(160, self.update_noise)
 
     def update_quote(self) -> None:
         self.user_label.configure(text=QUOTES[self.quote_index])
@@ -422,7 +448,7 @@ class ResonanceApp(customtkinter.CTk):
         self.context_menu = menu
         menu.overrideredirect(True)
         menu.attributes("-topmost", True)
-        menu.configure(fg_color="#FFF1F5")
+        menu.configure(fg_color=BACKGROUND)
         _, scaling = APP_SIZES[self.current_size_name]
         menu_width = round(320 / scaling)
         menu_height = round(340 / scaling)
@@ -434,10 +460,10 @@ class ResonanceApp(customtkinter.CTk):
 
         frame = customtkinter.CTkFrame(
             menu,
-            fg_color="#FFF1F5",
-            border_color="#F0B1C0",
-            border_width=1,
-            corner_radius=14,
+            fg_color=BACKGROUND,
+            border_color=INK,
+            border_width=self.outline_width(),
+            corner_radius=0,
         )
         frame.pack(fill="both", expand=True)
 
@@ -445,12 +471,8 @@ class ResonanceApp(customtkinter.CTk):
             frame,
             text="  RESONANCE",
             anchor="w",
-            text_color="#B84F6B",
-            font=customtkinter.CTkFont(
-                family="Segoe UI",
-                size=11,
-                weight="bold",
-            ),
+            text_color=INK,
+            font=customtkinter.CTkFont(family=MONO_FONT, size=11, weight="bold"),
         )
         title.pack(fill="x", padx=8, pady=(10, 5))
 
@@ -467,8 +489,8 @@ class ResonanceApp(customtkinter.CTk):
             size_frame,
             text="  Size",
             anchor="w",
-            text_color="#6F3044",
-            font=customtkinter.CTkFont(family="Segoe UI", size=11),
+            text_color=INK_SOFT,
+            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
         )
         size_label.pack(side="left", fill="x", expand=True)
         for size_name in APP_SIZES:
@@ -477,13 +499,14 @@ class ResonanceApp(customtkinter.CTk):
                 text=size_name,
                 width=29,
                 height=24,
-                corner_radius=8,
-                fg_color="#E58AA0" if size_name == self.size_var.get()
+                corner_radius=0,
+                fg_color=INK if size_name == self.size_var.get()
                 else "transparent",
-                hover_color="#D8758F",
-                text_color="#FFFFFF" if size_name == self.size_var.get()
-                else "#9A5B6D",
-                font=customtkinter.CTkFont(size=10, weight="bold"),
+                hover_color=INK_SOFT if size_name == self.size_var.get()
+                else HOVER,
+                text_color=BACKGROUND if size_name == self.size_var.get()
+                else MUTED,
+                font=customtkinter.CTkFont(family=MONO_FONT, size=10, weight="bold"),
                 command=lambda name=size_name: self.set_menu_size(name),
             )
             button.pack(side="left", padx=1)
@@ -501,7 +524,7 @@ class ResonanceApp(customtkinter.CTk):
             frame,
             "Exit",
             self.close_app,
-            text_color="#B84F6B",
+            text_color=ACCENT_DARK,
         )
 
     def add_menu_button(
@@ -509,7 +532,7 @@ class ResonanceApp(customtkinter.CTk):
         parent: customtkinter.CTkFrame,
         text: str,
         command: Any,
-        text_color: str = "#6F3044",
+        text_color: str = INK_SOFT,
     ) -> customtkinter.CTkButton:
         button = customtkinter.CTkButton(
             parent,
@@ -517,11 +540,11 @@ class ResonanceApp(customtkinter.CTk):
             command=lambda: self.invoke_menu_command(command),
             anchor="w",
             height=32,
-            corner_radius=8,
+            corner_radius=0,
             fg_color="transparent",
-            hover_color="#F0B1C0",
+            hover_color=HOVER,
             text_color=text_color,
-            font=customtkinter.CTkFont(family="Segoe UI", size=11),
+            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
         )
         button.pack(fill="x", padx=8, pady=2)
         return button
@@ -555,31 +578,27 @@ class ResonanceApp(customtkinter.CTk):
         dialog.resizable(False, False)
         dialog.transient(self)
         dialog.grab_set()
-        dialog.configure(fg_color="#FFF1F5")
+        dialog.configure(fg_color=BACKGROUND)
 
         card = customtkinter.CTkFrame(
             dialog,
-            fg_color="#FFF1F5",
-            border_color="#F0B1C0",
-            border_width=1,
-            corner_radius=16,
+            fg_color=BACKGROUND,
+            border_color=INK,
+            border_width=self.outline_width(),
+            corner_radius=0,
         )
         card.pack(fill="both", expand=True, padx=8, pady=8)
         customtkinter.CTkLabel(
             card,
             text="Resonance",
-            text_color="#B84F6B",
-            font=customtkinter.CTkFont(
-                family="Segoe UI",
-                size=24,
-                weight="bold",
-            ),
+            text_color=INK,
+            font=customtkinter.CTkFont(family=MONO_FONT, size=22, weight="bold"),
         ).pack(pady=(22, 2))
         customtkinter.CTkLabel(
             card,
             text=f"version {APP_VERSION}",
-            text_color="#9A5B6D",
-            font=customtkinter.CTkFont(family="Segoe UI", size=11),
+            text_color=MUTED,
+            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
         ).pack()
         customtkinter.CTkLabel(
             card,
@@ -588,19 +607,21 @@ class ResonanceApp(customtkinter.CTk):
                 f"{APP_EMAIL}\n\n"
                 f"{APP_REPOSITORY}"
             ),
-            text_color="#6F3044",
+            text_color=INK_SOFT,
             justify="center",
             wraplength=285,
-            font=customtkinter.CTkFont(family="Segoe UI", size=10),
+            font=customtkinter.CTkFont(family=MONO_FONT, size=10),
         ).pack(pady=(15, 8))
         customtkinter.CTkButton(
             card,
             text="Close",
             width=100,
             height=32,
-            corner_radius=10,
-            fg_color="#D8758F",
-            hover_color="#C96B86",
+            corner_radius=0,
+            fg_color=INK,
+            hover_color=INK_SOFT,
+            text_color=BACKGROUND,
+            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
             command=dialog.destroy,
         ).pack(pady=(0, 14))
 
@@ -621,6 +642,8 @@ class ResonanceApp(customtkinter.CTk):
         self.geometry(geometry)
         width = int(geometry.split("x", maxsplit=1)[0])
         self.song_label.configure(wraplength=max(180, width - 40))
+        for button in (self.previous_button, self.next_button):
+            button.configure(border_width=self.outline_width())
         self.user_label.configure(wraplength=max(180, width - 40))
         self.controls_frame.pack_configure(
             pady=(16, 20)
@@ -628,6 +651,11 @@ class ResonanceApp(customtkinter.CTk):
             else (10, 14)
         )
         self.show_controls()
+
+    def outline_width(self) -> int:
+        # CTk scales border widths, so a 1px outline vanishes below 100%.
+        _, scaling = APP_SIZES[self.current_size_name]
+        return 2 if scaling < 1 else 1
 
     def handle_pointer_motion(self, event: tk.Event[tk.Misc]) -> None:
         return
@@ -676,8 +704,8 @@ class ResonanceApp(customtkinter.CTk):
         try:
             future.result()
         except Exception:
-            self.volume_label.configure(text="Volume unavailable")
-            self.after(2000, lambda: self.volume_label.configure(text="Volume"))
+            self.volume_label.configure(text="vol unavailable")
+            self.after(2000, lambda: self.volume_label.configure(text="vol"))
 
     @staticmethod
     def parse_version(version: str) -> tuple[int, ...]:
@@ -797,7 +825,7 @@ class ResonanceApp(customtkinter.CTk):
         metadata: str = " • ".join(value for value in (album, device) if value)
         self.track_meta_label.configure(text=metadata)
         self.play_pause_button.configure(
-            text="⏸" if song["is_playing"] else "▶"
+            text="||" if song["is_playing"] else ">"
         )
         duration_ms: int = song["duration_ms"]
         self.progress_ms = song["progress_ms"]
@@ -852,11 +880,11 @@ class ResonanceApp(customtkinter.CTk):
 
         fade_steps = 24
         fade_amount = min(step + 1, fade_steps) / fade_steps
-        background = "#FFF1F5"
-        title_color = self.blend_color("#B84F6B", background, fade_amount)
-        status_color = self.blend_color("#9A5B6D", background, fade_amount)
-        bar_color = self.blend_color("#E05A7A", background, fade_amount)
-        bar_background = self.blend_color("#F0B1C0", background, fade_amount)
+        background = BACKGROUND
+        title_color = self.blend_color(INK, background, fade_amount)
+        status_color = self.blend_color(MUTED, background, fade_amount)
+        bar_color = self.blend_color(INK, background, fade_amount)
+        bar_background = self.blend_color(RULE, background, fade_amount)
         self.loading_title.configure(text_color=title_color)
         self.loading_status.configure(text_color=status_color)
         self.loading_progress.configure(
@@ -943,8 +971,7 @@ class ResonanceApp(customtkinter.CTk):
     def load_album_art(self, image_url: str | None) -> None:
         self.album_art_url = image_url
         if not image_url:
-            self.album_art = None
-            self.album_art_label.configure(image=None, text="")
+            self.set_album_art(render_ascii_art(None))
             return
 
         self.album_art_request_active = True
@@ -961,7 +988,8 @@ class ResonanceApp(customtkinter.CTk):
     @staticmethod
     def download_album_art(image_url: str) -> Image.Image:
         with urlopen(image_url, timeout=5) as response:
-            return Image.open(BytesIO(response.read())).convert("RGB")
+            image = Image.open(BytesIO(response.read())).convert("RGB")
+        return render_ascii_art(image, seed=image_url)
 
     def album_art_request_finished(
         self,
@@ -982,13 +1010,16 @@ class ResonanceApp(customtkinter.CTk):
         try:
             image: Image.Image = future.result()
         except Exception:
-            self.album_art_label.configure(image=None, text="")
+            self.set_album_art(render_ascii_art(None))
             return
 
+        self.set_album_art(image)
+
+    def set_album_art(self, image: Image.Image) -> None:
         self.album_art = customtkinter.CTkImage(
             light_image=image,
             dark_image=image,
-            size=(120, 120),
+            size=(ALBUM_ART_SIZE, ALBUM_ART_SIZE),
         )
         self.album_art_label.configure(image=self.album_art, text="")
 
@@ -1009,8 +1040,10 @@ class ResonanceApp(customtkinter.CTk):
 
 
 def create_app() -> ResonanceApp:
-    customtkinter.set_appearance_mode("dark")
-    theme_path = Path(__file__).resolve().parents[1] / "assets" / "pink_theme.json"
+    customtkinter.set_appearance_mode("light")
+    theme_path = (
+        Path(__file__).resolve().parents[1] / "assets" / "terminal_theme.json"
+    )
     customtkinter.set_default_color_theme(str(theme_path))
     if os.name == "nt":
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
