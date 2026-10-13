@@ -19,6 +19,7 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
+from .calendar_page import CalendarPage
 from .launcher_panel import LauncherPanel
 from .todo_panel import TodoPanel
 from .weather_panel import WeatherPanel
@@ -32,8 +33,9 @@ from .windows import (
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
-HUB_GEOMETRY = "760x590"
+HUB_GEOMETRY = "760x640"
 WEATHER_COLUMN_WIDTH = 330
+PAGES: tuple[str, ...] = ("home", "calendar")
 HUB_ART_SIZE = 144
 
 
@@ -75,6 +77,21 @@ class HubWindow(customtkinter.CTkToplevel):
             font=mono(15, "bold"),
             text_color=INK,
         ).pack(side="left")
+        self.page_tabs: dict[str, customtkinter.CTkButton] = {}
+        for page_name in PAGES:
+            tab = customtkinter.CTkButton(
+                header,
+                text=page_name,
+                width=len(page_name) * 9 + 24,
+                height=24,
+                corner_radius=0,
+                fg_color="transparent",
+                hover_color=HOVER,
+                font=mono(12, "bold"),
+                command=lambda chosen=page_name: self.show_page(chosen),
+            )
+            tab.pack(side="left", padx=(16 if page_name == PAGES[0] else 2, 0))
+            self.page_tabs[page_name] = tab
         self.time_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             header,
             text="",
@@ -88,8 +105,13 @@ class HubWindow(customtkinter.CTkToplevel):
         self.launcher: LauncherPanel = LauncherPanel(self, self.app)
         self.launcher.pack(fill="x", padx=24, pady=(0, 10))
 
+        # Pages swap in below the launcher, which stays on every page.
+        self.home_page = customtkinter.CTkFrame(self, fg_color="transparent")
+        self.calendar_page: CalendarPage | None = None
+        self.page_name: str = PAGES[0]
+
         customtkinter.CTkLabel(
-            self,
+            self.home_page,
             text="NOW PLAYING",
             font=mono(10, "bold"),
             text_color=MUTED,
@@ -97,7 +119,10 @@ class HubWindow(customtkinter.CTkToplevel):
             height=16,
         ).pack(fill="x", padx=24)
 
-        now_playing = customtkinter.CTkFrame(self, fg_color="transparent")
+        now_playing = customtkinter.CTkFrame(
+            self.home_page,
+            fg_color="transparent",
+        )
         now_playing.pack(fill="x", padx=24, pady=(8, 0))
 
         self.album_art_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
@@ -170,7 +195,7 @@ class HubWindow(customtkinter.CTkToplevel):
             ),
         ]
 
-        columns = customtkinter.CTkFrame(self, fg_color="transparent")
+        columns = customtkinter.CTkFrame(self.home_page, fg_color="transparent")
         columns.pack(fill="x", padx=24, pady=(28, 0))
         weather_column = customtkinter.CTkFrame(
             columns,
@@ -187,6 +212,7 @@ class HubWindow(customtkinter.CTkToplevel):
         self.todo_panel: TodoPanel = TodoPanel(columns)
         self.todo_panel.pack(side="left", fill="both", expand=True, padx=(24, 0))
 
+        self.show_page(PAGES[0])
         self.set_album_art(self.app.album_art_image)
         if self.app.song is not None:
             self.show_song(self.app.song)
@@ -195,6 +221,28 @@ class HubWindow(customtkinter.CTkToplevel):
         # The suggestion dropdown floats above the panels packed after it.
         self.launcher.dropdown.lift()
         self.after(150, self.focus_launcher)
+
+    def show_page(self, name: str) -> None:
+        if name == "calendar" and self.calendar_page is None:
+            # Built on first visit to keep the hub quick to open.
+            self.calendar_page = CalendarPage(self)
+        pages = {"home": self.home_page, "calendar": self.calendar_page}
+        for page_name, page in pages.items():
+            if page is not None and page_name != name:
+                page.pack_forget()
+        if name == "home":
+            self.home_page.pack(fill="both", expand=True)
+        else:
+            pages[name].pack(fill="both", expand=True, padx=24, pady=(0, 16))
+        self.page_name = name
+        for page_name, tab in self.page_tabs.items():
+            selected = page_name == name
+            tab.configure(
+                text=f"[{page_name}]" if selected else page_name,
+                text_color=INK if selected else MUTED,
+            )
+        # Keep the launcher's dropdown above newly packed pages.
+        self.launcher.dropdown.lift()
 
     def focus_launcher(self) -> None:
         self.focus_force()

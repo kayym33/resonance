@@ -258,6 +258,8 @@ class LauncherPanel(customtkinter.CTkFrame):
             if hub is not None:
                 hub.todo_panel.add_task(suggestion.args)
                 self.show_status(f"added: {suggestion.args}")
+        elif suggestion.args in ("cal", "home") and self.app.hub is not None:
+            self.app.hub.show_page("calendar" if suggestion.args == "cal" else "home")
         elif suggestion.args == "player":
             self.app.open_player()
         elif suggestion.args == "quit":

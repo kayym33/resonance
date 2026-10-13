@@ -79,6 +79,8 @@ BUILTINS: dict[str, str] = {
     "player": "pop out the player",
     "play": "play a song on Spotify",
     "todo": "add a to-do",
+    "cal": "open the calendar",
+    "home": "back to the home page",
     "quit": f"quit {APP_NAME}",
 }
 

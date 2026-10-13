@@ -14,7 +14,7 @@ from .constants import (
 from .todo import Task, load_tasks, save_tasks
 from .windows import outline_width
 
-TASK_LIST_HEIGHT = 150
+TASK_LIST_HEIGHT = 200
 
 
 def mono(
