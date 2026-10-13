@@ -71,7 +71,7 @@ class TodoPanel(customtkinter.CTkFrame):
             placeholder_text_color=MUTED,
             font=mono(12),
         )
-        self.entry.pack(fill="x", pady=(8, 4))
+        self.entry.pack(fill="x", pady=(12, 8))
         self.entry.bind("<Return>", lambda _event: self.add_from_entry())
         self.entry.bind("<KP_Enter>", lambda _event: self.add_from_entry())
 
@@ -137,7 +137,7 @@ class TodoPanel(customtkinter.CTkFrame):
 
         for task in self.tasks:
             row = customtkinter.CTkFrame(self.task_list, fg_color="transparent")
-            row.pack(fill="x")
+            row.pack(fill="x", pady=2)
             customtkinter.CTkButton(
                 row,
                 text="[x]" if task.done else "[ ]",

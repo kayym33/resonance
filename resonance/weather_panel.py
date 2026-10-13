@@ -81,7 +81,7 @@ class WeatherPanel(customtkinter.CTkFrame):
             self,
             fg_color="transparent",
         )
-        self.body.pack(fill="x", pady=(8, 0))
+        self.body.pack(fill="x", pady=(12, 0))
 
         settings = load_settings()
         share_location = settings.get("share_location")

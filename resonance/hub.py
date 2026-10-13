@@ -10,6 +10,7 @@ from PIL import Image
 from .ascii_art import drift_noise, noise_line
 from .backend import REFRESH_TIME, get_time
 from .constants import (
+    ACCENT_DARK,
     APP_NAME,
     BACKGROUND,
     FAINT,
@@ -21,6 +22,7 @@ from .constants import (
 )
 from .calendar_page import CalendarPage
 from .launcher_panel import LauncherPanel
+from .menu import SIZE_ROW, MenuItem
 from .todo_panel import TodoPanel
 from .weather_panel import WeatherPanel
 from .windows import (
@@ -33,8 +35,11 @@ from .windows import (
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
-HUB_GEOMETRY = "760x640"
-WEATHER_COLUMN_WIDTH = 330
+HUB_GEOMETRY = "820x650"
+WEATHER_COLUMN_WIDTH = 340
+# Side margin and the gap between sections.
+MARGIN = 36
+SECTION_GAP = 32
 PAGES: tuple[str, ...] = ("home", "calendar")
 HUB_ART_SIZE = 144
 
@@ -56,6 +61,7 @@ class HubWindow(customtkinter.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.close_window)
         self.bind("<Control-q>", self.app.quit_app)
         self.bind("<Control-w>", self.close_window)
+        self.bind("<Button-3>", self.show_context_menu)
         prepare_window(self)
         self.noise_rng: random.Random = random.Random()
         self.album_art: customtkinter.CTkImage | None = None
@@ -67,10 +73,10 @@ class HubWindow(customtkinter.CTkToplevel):
             text_color=FAINT,
             height=12,
         )
-        self.noise_label.pack(fill="x", pady=(6, 0))
+        self.noise_label.pack(fill="x", pady=(8, 0))
 
         header = customtkinter.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=24, pady=(4, 0))
+        header.pack(fill="x", padx=MARGIN, pady=(8, 0))
         customtkinter.CTkLabel(
             header,
             text=APP_NAME,
@@ -100,10 +106,10 @@ class HubWindow(customtkinter.CTkToplevel):
         )
         self.time_label.pack(side="right")
 
-        add_rule(self, INK, padx=24, pady=(6, 10))
+        add_rule(self, INK, padx=MARGIN, pady=(10, 14))
 
         self.launcher: LauncherPanel = LauncherPanel(self, self.app)
-        self.launcher.pack(fill="x", padx=24, pady=(0, 10))
+        self.launcher.pack(fill="x", padx=MARGIN, pady=(0, 8))
 
         # Pages swap in below the launcher, which stays on every page.
         self.home_page = customtkinter.CTkFrame(self, fg_color="transparent")
@@ -117,13 +123,13 @@ class HubWindow(customtkinter.CTkToplevel):
             text_color=MUTED,
             anchor="w",
             height=16,
-        ).pack(fill="x", padx=24)
+        ).pack(fill="x", padx=MARGIN)
 
         now_playing = customtkinter.CTkFrame(
             self.home_page,
             fg_color="transparent",
         )
-        now_playing.pack(fill="x", padx=24, pady=(8, 0))
+        now_playing.pack(fill="x", padx=MARGIN, pady=(12, 0))
 
         self.album_art_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             now_playing,
@@ -134,7 +140,7 @@ class HubWindow(customtkinter.CTkToplevel):
         self.album_art_label.pack(side="left")
 
         info = customtkinter.CTkFrame(now_playing, fg_color="transparent")
-        info.pack(side="left", fill="both", expand=True, padx=(20, 0))
+        info.pack(side="left", fill="both", expand=True, padx=(28, 0))
 
         self.song_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             info,
@@ -145,7 +151,7 @@ class HubWindow(customtkinter.CTkToplevel):
             justify="left",
             wraplength=500,
         )
-        self.song_label.pack(fill="x", pady=(8, 0))
+        self.song_label.pack(fill="x", pady=(6, 0))
         self.artist_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             info,
             text="",
@@ -153,7 +159,7 @@ class HubWindow(customtkinter.CTkToplevel):
             text_color=INK_SOFT,
             anchor="w",
         )
-        self.artist_label.pack(fill="x", pady=(2, 0))
+        self.artist_label.pack(fill="x", pady=(4, 0))
         self.meta_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             info,
             text="",
@@ -161,10 +167,10 @@ class HubWindow(customtkinter.CTkToplevel):
             text_color=MUTED,
             anchor="w",
         )
-        self.meta_label.pack(fill="x")
+        self.meta_label.pack(fill="x", pady=(2, 0))
 
         controls = customtkinter.CTkFrame(info, fg_color="transparent")
-        controls.pack(anchor="w", pady=(14, 0))
+        controls.pack(anchor="w", pady=(18, 0))
         self.outlined_buttons: list[customtkinter.CTkButton] = [
             self.add_outlined_button(controls, "|<", 48, self.app.previous_song),
         ]
@@ -183,7 +189,7 @@ class HubWindow(customtkinter.CTkToplevel):
                 command=self.app.toggle_playback,
             )
         )
-        self.play_pause_button.pack(side="left", padx=(0, 6))
+        self.play_pause_button.pack(side="left", padx=(0, 8))
         self.outlined_buttons += [
             self.add_outlined_button(controls, ">|", 48, self.app.next_song),
             self.add_outlined_button(
@@ -191,12 +197,12 @@ class HubWindow(customtkinter.CTkToplevel):
                 "pop out ->",
                 110,
                 self.app.open_player,
-                padx=(16, 0),
+                padx=(20, 0),
             ),
         ]
 
         columns = customtkinter.CTkFrame(self.home_page, fg_color="transparent")
-        columns.pack(fill="x", padx=24, pady=(28, 0))
+        columns.pack(fill="x", padx=MARGIN, pady=(SECTION_GAP, 0))
         weather_column = customtkinter.CTkFrame(
             columns,
             width=WEATHER_COLUMN_WIDTH,
@@ -210,7 +216,7 @@ class HubWindow(customtkinter.CTkToplevel):
         )
         self.weather_panel.pack(fill="x")
         self.todo_panel: TodoPanel = TodoPanel(columns)
-        self.todo_panel.pack(side="left", fill="both", expand=True, padx=(24, 0))
+        self.todo_panel.pack(side="left", fill="both", expand=True, padx=(40, 0))
 
         self.show_page(PAGES[0])
         self.set_album_art(self.app.album_art_image)
@@ -233,7 +239,7 @@ class HubWindow(customtkinter.CTkToplevel):
         if name == "home":
             self.home_page.pack(fill="both", expand=True)
         else:
-            pages[name].pack(fill="both", expand=True, padx=24, pady=(0, 16))
+            pages[name].pack(fill="both", expand=True, padx=MARGIN, pady=(0, 24))
         self.page_name = name
         for page_name, tab in self.page_tabs.items():
             selected = page_name == name
@@ -243,6 +249,26 @@ class HubWindow(customtkinter.CTkToplevel):
             )
         # Keep the launcher's dropdown above newly packed pages.
         self.launcher.dropdown.lift()
+
+    def show_context_menu(self, event: tk.Event[tk.Misc]) -> None:
+        self.app.show_context_menu(
+            self,
+            event,
+            [
+                MenuItem("Pop out player", self.app.open_player),
+                MenuItem("Open Spotify", self.app.open_spotify),
+                SIZE_ROW,
+                MenuItem("Refresh song", self.app.refresh_song),
+                MenuItem(
+                    "Check for updates",
+                    lambda: self.app.check_for_updates(self),
+                    enabled=self.app.update_check_enabled,
+                ),
+                MenuItem(f"About {APP_NAME}", lambda: self.app.show_about(self)),
+                MenuItem("Close hub", self.close_window),
+                MenuItem(f"Quit {APP_NAME}", self.app.quit_app, ACCENT_DARK),
+            ],
+        )
 
     def focus_launcher(self) -> None:
         self.focus_force()
@@ -254,7 +280,7 @@ class HubWindow(customtkinter.CTkToplevel):
         text: str,
         width: int,
         command: Any,
-        padx: tuple[int, int] = (0, 6),
+        padx: tuple[int, int] = (0, 8),
     ) -> customtkinter.CTkButton:
         button = customtkinter.CTkButton(
             parent,

@@ -97,7 +97,7 @@ class LauncherPanel(customtkinter.CTkFrame):
             anchor="w",
             height=16,
         )
-        self.status_label.pack(fill="x", pady=(4, 0))
+        self.status_label.pack(fill="x", pady=(6, 0))
 
         # Lives on the hub so it can float over the panels below.
         self.dropdown: customtkinter.CTkFrame = customtkinter.CTkFrame(

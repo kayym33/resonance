@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-import os
 import random
-import sys
 import time
 import tkinter as tk
-import webbrowser
 from concurrent.futures import Future
-from pathlib import Path
-from tkinter import messagebox
 from typing import TYPE_CHECKING, Any
 
 import customtkinter
@@ -24,12 +19,8 @@ from .constants import (
     ACCENT,
     ACCENT_DARK,
     ALBUM_ART_SIZE,
-    APP_AUTHOR,
-    APP_EMAIL,
     APP_NAME,
-    APP_REPOSITORY,
     APP_SIZES,
-    APP_VERSION,
     BACKGROUND,
     FAINT,
     HOVER,
@@ -41,7 +32,7 @@ from .constants import (
     RULE,
     MIN_LOADING_TIME
 )
-from . import updater
+from .menu import SIZE_ROW, MenuItem
 from .windows import cancel_pending_after, outline_width, prepare_window
 
 if TYPE_CHECKING:
@@ -52,7 +43,6 @@ class PlayerWindow(customtkinter.CTkToplevel):
     def __init__(self, app: ResonanceApp) -> None:
         super().__init__(app)
         self.app: ResonanceApp = app
-        self.size_var: tk.StringVar = tk.StringVar(value=app.size_name)
         self.current_size_name: str = app.size_name
         self.smallest_size_name: str = next(iter(APP_SIZES))
         self.controls_visible: bool = True
@@ -86,8 +76,6 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.loading_progress_value: float = 0.0
         self.loading_started_at: float = time.monotonic()
         self.quote_index: int = 0
-        self.context_menu: customtkinter.CTkToplevel | None = None
-        self.update_check_enabled: bool = True
         self.noise_rng: random.Random = random.Random()
 
         self.noise_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
@@ -411,211 +399,44 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.geometry(f"+{x}+{y}")
 
     def show_context_menu(self, event: tk.Event[tk.Misc]) -> None:
-        if self.context_menu is not None:
-            self.context_menu.destroy()
-
-        menu = customtkinter.CTkToplevel(self)
-        self.context_menu = menu
-        menu.overrideredirect(True)
-        menu.attributes("-topmost", True)
-        menu.configure(fg_color=BACKGROUND)
-        # CTk scales the size but not the position, which is in screen pixels.
-        menu.geometry(f"320x372+{event.x_root}+{event.y_root}")
-        menu.bind("<Escape>", lambda _: self.close_context_menu())
-        menu.focus_force()
-
-        frame = customtkinter.CTkFrame(
-            menu,
-            fg_color=BACKGROUND,
-            border_color=INK,
-            border_width=outline_width(self),
-            corner_radius=0,
+        check = "✓" if self.always_on_top_var.get() else " "
+        self.app.show_context_menu(
+            self,
+            event,
+            [
+                MenuItem("Open hub", self.app.open_hub),
+                MenuItem("Open Spotify", self.app.open_spotify),
+                MenuItem(f"{check}  Always on top", self.toggle_menu_always_on_top),
+                SIZE_ROW,
+                MenuItem("Refresh song", self.app.refresh_song),
+                MenuItem(
+                    "Check for updates",
+                    lambda: self.app.check_for_updates(self),
+                    enabled=self.app.update_check_enabled,
+                ),
+                MenuItem(f"About {APP_NAME}", lambda: self.app.show_about(self)),
+                MenuItem("Close player", self.close_window),
+                MenuItem(f"Quit {APP_NAME}", self.app.quit_app, ACCENT_DARK),
+            ],
         )
-        frame.pack(fill="both", expand=True)
-
-        title = customtkinter.CTkLabel(
-            frame,
-            text=f"  {APP_NAME}",
-            anchor="w",
-            text_color=INK,
-            font=customtkinter.CTkFont(family=MONO_FONT, size=11, weight="bold"),
-        )
-        title.pack(fill="x", padx=8, pady=(10, 5))
-
-        self.add_menu_button(frame, "Open hub", self.app.open_hub)
-        self.add_menu_button(frame, "Open Spotify", self.open_spotify)
-        self.add_menu_button(
-            frame,
-            f"{'✓' if self.always_on_top_var.get() else ' '}  Always on top",
-            self.toggle_menu_always_on_top,
-        )
-
-        size_frame = customtkinter.CTkFrame(frame, fg_color="transparent")
-        size_frame.pack(fill="x", padx=8, pady=2)
-        size_label = customtkinter.CTkLabel(
-            size_frame,
-            text="  Size",
-            anchor="w",
-            text_color=INK_SOFT,
-            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
-        )
-        size_label.pack(side="left", fill="x", expand=True)
-        for size_name in APP_SIZES:
-            button = customtkinter.CTkButton(
-                size_frame,
-                text=size_name,
-                width=29,
-                height=24,
-                corner_radius=0,
-                fg_color=INK if size_name == self.size_var.get()
-                else "transparent",
-                hover_color=INK_SOFT if size_name == self.size_var.get()
-                else HOVER,
-                text_color=BACKGROUND if size_name == self.size_var.get()
-                else MUTED,
-                font=customtkinter.CTkFont(family=MONO_FONT, size=10, weight="bold"),
-                command=lambda name=size_name: self.set_menu_size(name),
-            )
-            button.pack(side="left", padx=1)
-
-        self.add_menu_button(frame, "Refresh song", self.refresh_song)
-        update_button = self.add_menu_button(
-            frame,
-            "Check for updates",
-            self.check_for_updates,
-        )
-        if not self.update_check_enabled:
-            update_button.configure(state="disabled")
-        self.add_menu_button(frame, f"About {APP_NAME}", self.show_about)
-        self.add_menu_button(frame, "Close player", self.close_window)
-        self.add_menu_button(
-            frame,
-            f"Quit {APP_NAME}",
-            self.app.quit_app,
-            text_color=ACCENT_DARK,
-        )
-
-    def add_menu_button(
-        self,
-        parent: customtkinter.CTkFrame,
-        text: str,
-        command: Any,
-        text_color: str = INK_SOFT,
-    ) -> customtkinter.CTkButton:
-        button = customtkinter.CTkButton(
-            parent,
-            text=text,
-            command=lambda: self.invoke_menu_command(command),
-            anchor="w",
-            height=32,
-            corner_radius=0,
-            fg_color="transparent",
-            hover_color=HOVER,
-            text_color=text_color,
-            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
-        )
-        button.pack(fill="x", padx=8, pady=2)
-        return button
-
-    def invoke_menu_command(self, command: Any) -> None:
-        self.close_context_menu()
-        command()
-
-    def close_context_menu(self) -> None:
-        if self.context_menu is not None:
-            self.context_menu.destroy()
-            self.context_menu = None
 
     def toggle_menu_always_on_top(self) -> None:
         self.always_on_top_var.set(not self.always_on_top_var.get())
         self.toggle_always_on_top()
-        self.close_context_menu()
-
-    def set_menu_size(self, size_name: str) -> None:
-        self.set_app_size(size_name)
-        self.close_context_menu()
-
-    def open_spotify(self) -> None:
-        if not webbrowser.open("spotify:"):
-            webbrowser.open("https://open.spotify.com/")
-
-    def show_about(self) -> None:
-        dialog = customtkinter.CTkToplevel(self)
-        dialog.title(f"About {APP_NAME}")
-        dialog.geometry("330x285")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
-        dialog.configure(fg_color=BACKGROUND)
-
-        card = customtkinter.CTkFrame(
-            dialog,
-            fg_color=BACKGROUND,
-            border_color=INK,
-            border_width=outline_width(self),
-            corner_radius=0,
-        )
-        card.pack(fill="both", expand=True, padx=8, pady=8)
-        customtkinter.CTkLabel(
-            card,
-            text=APP_NAME,
-            text_color=INK,
-            font=customtkinter.CTkFont(family=MONO_FONT, size=22, weight="bold"),
-        ).pack(pady=(22, 2))
-        customtkinter.CTkLabel(
-            card,
-            text=f"version {APP_VERSION}",
-            text_color=MUTED,
-            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
-        ).pack()
-        customtkinter.CTkLabel(
-            card,
-            text=(
-                f"made with love by {APP_AUTHOR}\n"
-                f"{APP_EMAIL}\n\n"
-                f"{APP_REPOSITORY}"
-            ),
-            text_color=INK_SOFT,
-            justify="center",
-            wraplength=285,
-            font=customtkinter.CTkFont(family=MONO_FONT, size=10),
-        ).pack(pady=(15, 8))
-        customtkinter.CTkButton(
-            card,
-            text="Close",
-            width=100,
-            height=32,
-            corner_radius=0,
-            fg_color=INK,
-            hover_color=INK_SOFT,
-            text_color=BACKGROUND,
-            font=customtkinter.CTkFont(family=MONO_FONT, size=11),
-            command=dialog.destroy,
-        ).pack(pady=(0, 14))
 
     def toggle_always_on_top(self) -> None:
         self.always_on_top = self.always_on_top_var.get()
         self.attributes("-topmost", self.always_on_top)
 
-    def set_app_size(self, size_name: str) -> None:
-        size = APP_SIZES.get(size_name)
-        if size is None:
-            raise ValueError(f"Unknown app size: {size_name}")
-
-        geometry, scaling = size
-        self.size_var.set(size_name)
+    def apply_size(self, size_name: str) -> None:
+        """Fit the window to a size preset; the app sets the zoom."""
+        geometry, _ = APP_SIZES[size_name]
         self.current_size_name = size_name
-        self.app.size_name = size_name
-        customtkinter.set_widget_scaling(scaling)
-        customtkinter.set_window_scaling(scaling)
         self.geometry(geometry)
         width = int(geometry.split("x", maxsplit=1)[0])
         self.song_label.configure(wraplength=max(180, width - 40))
         for button in (self.previous_button, self.next_button):
             button.configure(border_width=outline_width(self))
-        # Scaling is app-wide, so the hub resizes with the player.
-        if self.app.hub is not None:
-            self.app.hub.refresh_outlines()
         self.user_label.configure(wraplength=max(180, width - 40))
         self.controls_frame.pack_configure(
             pady=(16, 20)
@@ -647,9 +468,6 @@ class PlayerWindow(customtkinter.CTkToplevel):
         )
         self.controls_visible = True
 
-    def refresh_song(self) -> None:
-        self.app.refresh_song()
-
     def change_volume(self, value: float) -> None:
         if self.volume_update_active:
             return
@@ -675,94 +493,6 @@ class PlayerWindow(customtkinter.CTkToplevel):
         except Exception:
             self.volume_label.configure(text="vol unavailable")
             self.after(2000, lambda: self.volume_label.configure(text="vol"))
-
-    @staticmethod
-    def parse_version(version: str) -> tuple[int, ...]:
-        return updater.parse_version(version)
-
-    @staticmethod
-    def find_update() -> tuple[str, str] | None:
-        return updater.find_update()
-
-    @staticmethod
-    def download_update(download_url: str) -> Path:
-        return updater.download_update(download_url)
-
-    def check_for_updates(self) -> None:
-        if os.name != "nt" or not getattr(sys, "frozen", False):
-            messagebox.showinfo(
-                "Updates",
-                "Automatic updates are available for the Windows executable "
-                "distributed through GitHub Releases.",
-                parent=self,
-            )
-            return
-
-        self.update_check_enabled = False
-        self.close_context_menu()
-        self.app.worker.submit(self.find_update).add_done_callback(
-            self.update_check_finished
-        )
-
-    def update_check_finished(
-        self,
-        future: Future[tuple[str, str] | None],
-    ) -> None:
-        self.after(0, self.apply_update_check, future)
-
-    def apply_update_check(
-        self,
-        future: Future[tuple[str, str] | None],
-    ) -> None:
-        self.update_check_enabled = True
-        if not self.winfo_exists():
-            return
-        try:
-            update = future.result()
-        except Exception as error:
-            messagebox.showerror(
-                "Update check failed",
-                f"Could not check GitHub Releases:\n{error}",
-                parent=self,
-            )
-            return
-
-        if update is None or self.parse_version(update[0]) <= self.parse_version(
-            APP_VERSION
-        ):
-            messagebox.showinfo(
-                "Updates",
-                f"{APP_NAME} {APP_VERSION} is up to date.",
-                parent=self,
-            )
-            return
-
-        tag_name, download_url = update
-        if messagebox.askyesno(
-            "Update available",
-            f"{APP_NAME} {tag_name} is available. Download and install it now?",
-            parent=self,
-        ):
-            self.app.worker.submit(
-                self.download_update,
-                download_url,
-            ).add_done_callback(self.update_download_finished)
-
-    def update_download_finished(self, future: Future[Path]) -> None:
-        self.after(0, self.apply_downloaded_update, future)
-
-    def apply_downloaded_update(self, future: Future[Path]) -> None:
-        try:
-            download_path = future.result()
-            updater.install_update(download_path)
-        except Exception as error:
-            messagebox.showerror(
-                "Update failed",
-                f"Could not install the update:\n{error}",
-                parent=self,
-            )
-            return
-        self.app.quit_app()
 
     def show_song_error(self) -> None:
         self.artist_label.configure(text="Spotify unavailable :<")

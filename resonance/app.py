@@ -2,16 +2,21 @@ from __future__ import annotations
 
 import ctypes
 import os
+import sys
 import tkinter as tk
+import webbrowser
 from concurrent.futures import Future, ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
+from tkinter import messagebox
 from typing import Any
 from urllib.request import urlopen
 
 import customtkinter
 from PIL import Image
 
+from . import updater
+from .about import show_about
 from .ascii_art import render_ascii_art
 from .backend import (
     SPOTIFY_REFRESH_TIME,
@@ -20,9 +25,10 @@ from .backend import (
     previous_song,
     toggle_playback,
 )
-from .constants import APP_NAME, APP_SIZES, DEFAULT_SIZE
+from .constants import APP_NAME, APP_SIZES, APP_VERSION, DEFAULT_SIZE
 from .hub import HubWindow
 from .instance import listen
+from .menu import MenuItem, build_context_menu
 from .player import PlayerWindow
 from .windows import prepare_window
 
@@ -46,8 +52,10 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art_image: Image.Image = render_ascii_art(None)
         self.hub: HubWindow | None = None
         self.player: PlayerWindow | None = None
-        # Size preset chosen in the player; the zoom it sets is app-wide.
+        # Size preset from the right-click menu; its zoom is app-wide.
         self.size_name: str = DEFAULT_SIZE
+        self.context_menu: customtkinter.CTkToplevel | None = None
+        self.update_check_enabled: bool = True
         # Tk's Entry treats Ctrl+A as "go to line start"; make it select all.
         self.bind_class("Entry", "<Control-a>", self.select_all)
         # A second launch of the app asks this copy to show the hub.
@@ -102,6 +110,136 @@ class ResonanceApp(customtkinter.CTk):
 
     def windows(self) -> list[HubWindow | PlayerWindow]:
         return [window for window in (self.hub, self.player) if window]
+
+    def dialog_parent(
+        self,
+        preferred: customtkinter.CTkToplevel,
+    ) -> tk.Misc:
+        """A live window to own a dialog, in case ``preferred`` closed."""
+        if preferred.winfo_exists():
+            return preferred
+        return next(iter(self.windows()), self)
+
+    # Right-click menu, shared by the hub and the player.
+
+    def show_context_menu(
+        self,
+        owner: customtkinter.CTkToplevel,
+        event: tk.Event[tk.Misc],
+        items: list[MenuItem | str],
+    ) -> None:
+        self.close_context_menu()
+        self.context_menu = build_context_menu(
+            owner,
+            event.x_root,
+            event.y_root,
+            items,
+            self.size_name,
+            self.set_size,
+            self.close_context_menu,
+        )
+
+    def close_context_menu(self) -> None:
+        menu, self.context_menu = self.context_menu, None
+        if menu is not None and menu.winfo_exists():
+            menu.destroy()
+
+    def set_size(self, size_name: str) -> None:
+        _, scaling = APP_SIZES[size_name]
+        self.size_name = size_name
+        customtkinter.set_widget_scaling(scaling)
+        customtkinter.set_window_scaling(scaling)
+        if self.player is not None:
+            self.player.apply_size(size_name)
+        if self.hub is not None:
+            self.hub.refresh_outlines()
+
+    def show_about(self, parent: customtkinter.CTkToplevel) -> None:
+        show_about(parent)
+
+    @staticmethod
+    def open_spotify() -> None:
+        if not webbrowser.open("spotify:"):
+            webbrowser.open("https://open.spotify.com/")
+
+    # Self-update (Windows executable only).
+
+    def check_for_updates(self, parent: customtkinter.CTkToplevel) -> None:
+        if os.name != "nt" or not getattr(sys, "frozen", False):
+            messagebox.showinfo(
+                "Updates",
+                "Automatic updates are available for the Windows executable "
+                "distributed through GitHub Releases.",
+                parent=parent,
+            )
+            return
+
+        self.update_check_enabled = False
+        self.worker.submit(updater.find_update).add_done_callback(
+            lambda future: self.after(0, self.apply_update_check, future, parent)
+        )
+
+    def apply_update_check(
+        self,
+        future: Future[tuple[str, str] | None],
+        parent: customtkinter.CTkToplevel,
+    ) -> None:
+        self.update_check_enabled = True
+        parent = self.dialog_parent(parent)
+        try:
+            update = future.result()
+        except Exception as error:
+            messagebox.showerror(
+                "Update check failed",
+                f"Could not check GitHub Releases:\n{error}",
+                parent=parent,
+            )
+            return
+
+        if update is None or updater.parse_version(
+            update[0]
+        ) <= updater.parse_version(APP_VERSION):
+            messagebox.showinfo(
+                "Updates",
+                f"{APP_NAME} {APP_VERSION} is up to date.",
+                parent=parent,
+            )
+            return
+
+        tag_name, download_url = update
+        if messagebox.askyesno(
+            "Update available",
+            f"{APP_NAME} {tag_name} is available. Download and install it now?",
+            parent=parent,
+        ):
+            self.worker.submit(
+                updater.download_update,
+                download_url,
+            ).add_done_callback(
+                lambda future: self.after(
+                    0,
+                    self.apply_downloaded_update,
+                    future,
+                    parent,
+                )
+            )
+
+    def apply_downloaded_update(
+        self,
+        future: Future[Path],
+        parent: customtkinter.CTkToplevel,
+    ) -> None:
+        try:
+            download_path = future.result()
+            updater.install_update(download_path)
+        except Exception as error:
+            messagebox.showerror(
+                "Update failed",
+                f"Could not install the update:\n{error}",
+                parent=self.dialog_parent(parent),
+            )
+            return
+        self.quit_app()
 
     def poll_song(self) -> None:
         self.refresh_song()

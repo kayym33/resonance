@@ -71,7 +71,7 @@ class CalendarPage(customtkinter.CTkFrame):
             font=mono(14, "bold"),
             text_color=INK,
         )
-        self.title_label.pack(side="left", padx=(14, 0))
+        self.title_label.pack(side="left", padx=(16, 0))
         self.view_buttons: dict[str, customtkinter.CTkButton] = {}
         for view in reversed(VIEWS):
             button = customtkinter.CTkButton(
@@ -84,7 +84,7 @@ class CalendarPage(customtkinter.CTkFrame):
                 font=mono(11, "bold"),
                 command=lambda chosen=view: self.set_view(chosen),
             )
-            button.pack(side="right", padx=(4, 0))
+            button.pack(side="right", padx=(6, 0))
             self.view_buttons[view] = button
 
         self.header_canvas = tk.Canvas(
@@ -94,7 +94,7 @@ class CalendarPage(customtkinter.CTkFrame):
             highlightthickness=0,
             bd=0,
         )
-        self.header_canvas.pack(fill="x", pady=(10, 0))
+        self.header_canvas.pack(fill="x", pady=(16, 0))
         body = tk.Frame(self, bg=BACKGROUND, bd=0, highlightthickness=0)
         body.pack(fill="both", expand=True)
         self.grid_canvas = tk.Canvas(
@@ -152,7 +152,7 @@ class CalendarPage(customtkinter.CTkFrame):
             text_color=INK,
             font=mono(11, "bold"),
             command=command,
-        ).pack(side="left", padx=(0, 4))
+        ).pack(side="left", padx=(0, 6))
 
     def set_view(self, view: str) -> None:
         self.view = view
