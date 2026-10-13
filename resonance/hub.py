@@ -18,12 +18,13 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
+from .weather_panel import WeatherPanel
 from .windows import cancel_pending_after, outline_width, prepare_window
 
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
-HUB_GEOMETRY = "620x320"
+HUB_GEOMETRY = "620x430"
 HUB_ART_SIZE = 144
 
 
@@ -162,6 +163,9 @@ class HubWindow(customtkinter.CTkToplevel):
             ),
         ]
 
+        self.weather_panel: WeatherPanel = WeatherPanel(self, self.app)
+        self.weather_panel.pack(fill="x", padx=24, pady=(28, 0))
+
         self.set_album_art(self.app.album_art_image)
         if self.app.song is not None:
             self.show_song(self.app.song)
@@ -196,6 +200,7 @@ class HubWindow(customtkinter.CTkToplevel):
     def refresh_outlines(self) -> None:
         for button in self.outlined_buttons:
             button.configure(border_width=outline_width(self))
+        self.weather_panel.refresh_outlines()
 
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
