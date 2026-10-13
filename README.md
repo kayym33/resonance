@@ -68,6 +68,29 @@ email address of their Spotify account. Spotify allows up to 25 people. The
 app's redirect URIs must include `http://127.0.0.1:8888/callback` exactly
 (`localhost` doesn't count as the same address).
 
+## Accounts and sync
+
+Sign in to keep your to-dos, calendar, weather location, launcher commands
+and display name the same on every computer. t1ld3 offers to sign you in the
+first time it starts. Later, click the name (or **sign in**) at the top right
+of the hub, right-click and choose **Account**, or type `account` in the
+launcher.
+
+Accounts are invite-only. **Owner:** create them in the Supabase dashboard
+under **Authentication → Users → Add user**, and keep **Allow new users to
+sign up** turned off. People can change their password from the account
+window.
+
+You can also use t1ld3 without an account. Everything works the same and
+stays on that computer, and it uploads the first time you sign in. Edits made
+offline sync when you're back online. If the same thing was changed on two
+computers, the most recent change wins. Launcher commands sync separately for
+Windows and Linux, and window size and Spotify sign-in stay per computer.
+
+**Owner, one-time setup:** run `supabase/schema.sql` in the Supabase SQL
+editor. It creates the table that holds everyone's data, with rules so each
+person can only reach their own.
+
 ## Using the hub
 
 ### Launcher
@@ -138,8 +161,9 @@ Everything is stored on your computer in the data folder:
 | Linux | `~/t1ld3` |
 
 The folder holds `todo.json`, `events.json`, `commands.json`,
-`settings.json` and your Spotify sign-in token (`spotify-token.json`). Don't
-share the token. A `Resonance` folder from an older version is moved here
+`settings.json`, `profile.json` and `device.json`, plus the sync bookkeeping
+in `sync.json`. It also holds two sign-in files that you shouldn't share:
+`spotify-token.json` for Spotify and `session.json` for your t1ld3 account. A `Resonance` folder from an older version is moved here
 automatically.
 
 ## Updates (Windows)

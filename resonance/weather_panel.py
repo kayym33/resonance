@@ -82,10 +82,16 @@ class WeatherPanel(customtkinter.CTkFrame):
             fg_color="transparent",
         )
         self.body.pack(fill="x", pady=(12, 0))
+        self.start()
 
+    def weather_settings(self) -> tuple[object, object]:
         settings = load_settings()
-        share_location = settings.get("share_location")
-        self.location = Location.from_dict(settings.get("weather_location"))
+        return settings.get("share_location"), settings.get("weather_location")
+
+    def start(self) -> None:
+        share_location, saved_location = self.weather_settings()
+        self.started_with = (share_location, saved_location)
+        self.location = Location.from_dict(saved_location)
         if share_location is True:
             self.locate()
         elif self.location is not None:
@@ -94,6 +100,14 @@ class WeatherPanel(customtkinter.CTkFrame):
             self.show_city_entry()
         else:
             self.show_location_prompt()
+
+    def reload(self) -> None:
+        """Follow a location chosen on another device."""
+        if self.weather_settings() == self.started_with:
+            return
+        self.cancel_refresh()
+        self.request_id += 1
+        self.start()
 
     # Screens
 

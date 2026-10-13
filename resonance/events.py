@@ -1,4 +1,4 @@
-"""Calendar events stored locally in events.json.
+"""Calendar events, kept in the synced "event" collection.
 
 Named ``events`` rather than ``calendar`` to avoid confusion with the
 standard library module.
@@ -6,15 +6,15 @@ standard library module.
 
 from __future__ import annotations
 
-import json
 import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from typing import Any
 
 from .paths import DATA_DIR
+from .store import Collection
 
-EVENTS_PATH = DATA_DIR / "events.json"
 DEFAULT_DURATION = timedelta(hours=1)
 TIME_PATTERN = re.compile(r"^(\d{1,2})(?::?(\d{2}))?$")
 
@@ -101,21 +101,37 @@ def parse_day(text: str) -> date:
     raise ValueError(f'"{text}" isn\'t a date, try 2026-10-14')
 
 
+def legacy_events(raw: object) -> dict[str, dict[str, Any]]:
+    """Convert the pre-sync list of event dicts."""
+    if not isinstance(raw, list):
+        return {}
+    events = (Event.from_dict(item) for item in raw)
+    return {event.id: event_data(event) for event in events if event}
+
+
+def event_data(event: Event) -> dict[str, Any]:
+    data = event.to_dict()
+    del data["id"]
+    return data
+
+
+EVENTS = Collection("event", DATA_DIR / "events.json", legacy_events)
+
+
 def load_events() -> list[Event]:
-    try:
-        with EVENTS_PATH.open(encoding="utf-8") as events_file:
-            data: object = json.load(events_file)
-    except (OSError, ValueError):
-        return []
-    if not isinstance(data, list):
-        return []
-    return [event for item in data if (event := Event.from_dict(item))]
+    events = (
+        Event.from_dict({**data, "id": event_id})
+        for event_id, data in EVENTS.items()
+    )
+    return [event for event in events if event]
 
 
-def save_events(events: list[Event]) -> None:
-    EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with EVENTS_PATH.open("w", encoding="utf-8") as events_file:
-        json.dump([event.to_dict() for event in events], events_file, indent=2)
+def save_event(event: Event) -> None:
+    EVENTS.put(event.id, event_data(event))
+
+
+def delete_event(event: Event) -> None:
+    EVENTS.delete(event.id)
 
 
 def events_on(events: list[Event], day: date) -> list[Event]:

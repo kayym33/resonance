@@ -8,14 +8,18 @@ import re
 import shutil
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote_plus
 
 from .constants import APP_NAME
 from .paths import DATA_DIR
+from .store import parse_iso
 
 COMMANDS_PATH = DATA_DIR / "commands.json"
+# Commands sync per platform, since program names and paths differ.
+PLATFORM = "windows" if os.name == "nt" else "linux"
 MAX_SUGGESTIONS = 6
 
 # Written to commands.json on first run so the user can edit them.
@@ -81,6 +85,7 @@ BUILTINS: dict[str, str] = {
     "todo": "add a to-do",
     "cal": "open the calendar",
     "home": "back to the home page",
+    "account": "sign in or manage your account",
     "quit": f"quit {APP_NAME}",
 }
 
@@ -119,6 +124,9 @@ def load_commands() -> list[Command]:
         COMMANDS_PATH.parent.mkdir(parents=True, exist_ok=True)
         with COMMANDS_PATH.open("w", encoding="utf-8") as commands_file:
             json.dump(DEFAULT_COMMANDS, commands_file, indent=2)
+        # Date the defaults to 1970 so commands synced from another device
+        # always win over them.
+        os.utime(COMMANDS_PATH, (0, 0))
 
     with COMMANDS_PATH.open(encoding="utf-8") as commands_file:
         data: object = json.load(commands_file)
@@ -139,6 +147,34 @@ def load_commands() -> list[Command]:
             )
         )
     return commands
+
+
+def commands_modified_at() -> str | None:
+    """When commands.json was last edited, as an ISO timestamp."""
+    try:
+        modified = COMMANDS_PATH.stat().st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(modified, timezone.utc).isoformat()
+
+
+def read_commands_file() -> dict[str, Any] | None:
+    try:
+        with COMMANDS_PATH.open(encoding="utf-8") as commands_file:
+            data: object = json.load(commands_file)
+    except (OSError, ValueError):
+        return None  # Missing, or mid-edit; try again next sync.
+    return data if isinstance(data, dict) else None
+
+
+def write_synced_commands(data: dict[str, Any], updated_at: str) -> str | None:
+    """Save commands from another device, dated to when they were edited
+    there so this device doesn't upload them again as a new edit."""
+    with COMMANDS_PATH.open("w", encoding="utf-8") as commands_file:
+        json.dump(data, commands_file, indent=2)
+    stamp = parse_iso(updated_at).timestamp()
+    os.utime(COMMANDS_PATH, (stamp, stamp))
+    return commands_modified_at()
 
 
 def expand_arg(template: str, args: str) -> str:

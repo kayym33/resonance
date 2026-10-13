@@ -260,6 +260,8 @@ class LauncherPanel(customtkinter.CTkFrame):
                 self.show_status(f"added: {suggestion.args}")
         elif suggestion.args in ("cal", "home") and self.app.hub is not None:
             self.app.hub.show_page("calendar" if suggestion.args == "cal" else "home")
+        elif suggestion.args == "account" and self.app.hub is not None:
+            self.app.open_account(self.app.hub)
         elif suggestion.args == "player":
             self.app.open_player()
         elif suggestion.args == "quit":

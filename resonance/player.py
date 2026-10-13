@@ -33,6 +33,7 @@ from .constants import (
     MIN_LOADING_TIME
 )
 from .menu import SIZE_ROW, MenuItem
+from .user_profile import display_name
 from .windows import cancel_pending_after, outline_width, prepare_window
 
 if TYPE_CHECKING:
@@ -500,7 +501,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.loading_status.configure(text="Please open Spotify and try again ♡")
 
     def show_song(self, song: dict[str, Any]) -> None:
-        username = str(song.get("username") or "Spotify user")
+        username = display_name() or str(song.get("username") or "Spotify user")
         self.user_label.configure(text=f"hii {username} !")
         self.finish_loading(username)
         self.song_label.configure(text=str(song["title"]))

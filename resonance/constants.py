@@ -17,6 +17,11 @@ MIN_LOADING_TIME: float = 1
 # must still be added under User Management in the Spotify dashboard.
 SPOTIFY_CLIENT_ID = "27ad76d41d944e17b2a571fd559f0e32"
 SPOTIFY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
+# Public by design: the publishable key only reaches what the database's
+# row-level security allows (each user's own rows). Never put the
+# service_role key in the app.
+SUPABASE_URL = "https://zuzpyrwoovdavbuqrqpx.supabase.co"
+SUPABASE_KEY = "sb_publishable_OXVfSivrBGVRZL1wr4J9Fw_xUql8kyQ"
 GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )

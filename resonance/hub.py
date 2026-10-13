@@ -105,6 +105,19 @@ class HubWindow(customtkinter.CTkToplevel):
             text_color=INK_SOFT,
         )
         self.time_label.pack(side="right")
+        self.account_button: customtkinter.CTkButton = customtkinter.CTkButton(
+            header,
+            text="",
+            width=0,
+            height=24,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color=HOVER,
+            font=mono(12),
+            command=lambda: self.app.open_account(self),
+        )
+        self.account_button.pack(side="right", padx=(0, 18))
+        self.show_account()
 
         add_rule(self, INK, padx=MARGIN, pady=(10, 14))
 
@@ -250,6 +263,13 @@ class HubWindow(customtkinter.CTkToplevel):
         # Keep the launcher's dropdown above newly packed pages.
         self.launcher.dropdown.lift()
 
+    def show_account(self) -> None:
+        text, problem = self.app.account_label()
+        self.account_button.configure(
+            text=text,
+            text_color=ACCENT_DARK if problem else MUTED,
+        )
+
     def show_context_menu(self, event: tk.Event[tk.Misc]) -> None:
         self.app.show_context_menu(
             self,
@@ -257,6 +277,7 @@ class HubWindow(customtkinter.CTkToplevel):
             [
                 MenuItem("Pop out player", self.app.open_player),
                 MenuItem("Open Spotify", self.app.open_spotify),
+                MenuItem("Account", lambda: self.app.open_account(self)),
                 SIZE_ROW,
                 MenuItem("Refresh song", self.app.refresh_song),
                 MenuItem(

@@ -11,7 +11,7 @@ from .constants import (
     MUTED,
     RULE,
 )
-from .todo import Task, load_tasks, save_tasks
+from .todo import Task, add_task, delete_task, load_tasks, save_task
 from .windows import outline_width
 
 TASK_LIST_HEIGHT = 200
@@ -92,8 +92,8 @@ class TodoPanel(customtkinter.CTkFrame):
         text = text.strip()
         if not text:
             return
-        self.tasks.append(Task(text))
-        self.save_and_render()
+        add_task(text)
+        self.reload()
 
     def add_from_entry(self) -> str:
         self.add_task(self.entry.get())
@@ -102,18 +102,22 @@ class TodoPanel(customtkinter.CTkFrame):
 
     def toggle_task(self, task: Task) -> None:
         task.done = not task.done
-        self.save_and_render()
+        save_task(task)
+        self.reload()
 
     def delete_task(self, task: Task) -> None:
-        self.tasks.remove(task)
-        self.save_and_render()
+        delete_task(task)
+        self.reload()
 
     def clear_done(self) -> None:
-        self.tasks = [task for task in self.tasks if not task.done]
-        self.save_and_render()
+        for task in self.tasks:
+            if task.done:
+                delete_task(task)
+        self.reload()
 
-    def save_and_render(self) -> None:
-        save_tasks(self.tasks)
+    def reload(self) -> None:
+        """Re-read tasks, including ones synced from other devices."""
+        self.tasks = load_tasks()
         self.render_tasks()
 
     def render_tasks(self) -> None:

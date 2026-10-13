@@ -19,7 +19,14 @@ from .constants import (
     RULE,
 )
 from .event_dialog import EventDialog
-from .events import Event, assign_lanes, events_on, load_events, save_events
+from .events import (
+    Event,
+    assign_lanes,
+    delete_event,
+    events_on,
+    load_events,
+    save_event,
+)
 from .windows import cancel_pending_after, outline_width
 
 VIEWS: tuple[str, ...] = ("today", "3 days", "week", "month")
@@ -611,9 +618,8 @@ class CalendarPage(customtkinter.CTkFrame):
         )
 
     def save_event(self, event: Event) -> None:
-        if event not in self.events:
-            self.events.append(event)
-        save_events(self.events)
+        save_event(event)
+        self.events = load_events()
         if self.view != "month" and event.day not in self.visible_days():
             self.anchor = event.day
         elif self.view == "month" and (event.day.year, event.day.month) != (
@@ -624,8 +630,12 @@ class CalendarPage(customtkinter.CTkFrame):
         self.redraw()
 
     def delete_event(self, event: Event) -> None:
-        self.events.remove(event)
-        save_events(self.events)
+        delete_event(event)
+        self.reload()
+
+    def reload(self) -> None:
+        """Re-read events, including ones synced from other devices."""
+        self.events = load_events()
         self.redraw()
 
     def destroy(self) -> None:

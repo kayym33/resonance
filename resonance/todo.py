@@ -1,35 +1,64 @@
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, dataclass
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from .paths import DATA_DIR
-
-TODO_PATH = DATA_DIR / "todo.json"
+from .store import Collection, now_iso
 
 
 @dataclass
 class Task:
+    id: str
     text: str
-    done: bool = False
+    done: bool
+    created_at: str
+
+
+def legacy_tasks(raw: object) -> dict[str, dict[str, Any]]:
+    """Convert the pre-sync list of {"text", "done"}, keeping its order."""
+    if not isinstance(raw, list):
+        return {}
+    start = datetime.now(timezone.utc)
+    return {
+        uuid.uuid4().hex: {
+            "text": str(item["text"]),
+            "done": bool(item.get("done")),
+            "created_at": (start + timedelta(microseconds=index)).isoformat(),
+        }
+        for index, item in enumerate(raw)
+        if isinstance(item, dict) and item.get("text")
+    }
+
+
+TASKS = Collection("task", DATA_DIR / "todo.json", legacy_tasks)
 
 
 def load_tasks() -> list[Task]:
-    try:
-        with TODO_PATH.open(encoding="utf-8") as todo_file:
-            data: object = json.load(todo_file)
-    except (OSError, ValueError):
-        return []
-    if not isinstance(data, list):
-        return []
-    return [
-        Task(str(item["text"]), bool(item.get("done", False)))
-        for item in data
-        if isinstance(item, dict) and item.get("text")
+    tasks = [
+        Task(
+            id=task_id,
+            text=str(data.get("text", "")),
+            done=bool(data.get("done")),
+            created_at=str(data.get("created_at", "")),
+        )
+        for task_id, data in TASKS.items()
     ]
+    return sorted(tasks, key=lambda task: task.created_at)
 
 
-def save_tasks(tasks: list[Task]) -> None:
-    TODO_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with TODO_PATH.open("w", encoding="utf-8") as todo_file:
-        json.dump([asdict(task) for task in tasks], todo_file, indent=2)
+def save_task(task: Task) -> None:
+    TASKS.put(
+        task.id,
+        {"text": task.text, "done": task.done, "created_at": task.created_at},
+    )
+
+
+def add_task(text: str) -> None:
+    save_task(Task(uuid.uuid4().hex, text, False, now_iso()))
+
+
+def delete_task(task: Task) -> None:
+    TASKS.delete(task.id)

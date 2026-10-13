@@ -17,6 +17,7 @@ from PIL import Image
 
 from . import updater
 from .about import show_about
+from .account_dialog import AccountDialog
 from .ascii_art import render_ascii_art
 from .backend import (
     SPOTIFY_REFRESH_TIME,
@@ -29,6 +30,9 @@ from .constants import APP_NAME, APP_SIZES, APP_VERSION, DEFAULT_SIZE
 from .hub import HubWindow
 from .instance import listen
 from .menu import MenuItem, build_context_menu
+from .settings import load_device_setting, save_device_setting
+from .sync import SyncEngine
+from .user_profile import display_name
 from .player import PlayerWindow
 from .windows import prepare_window
 
@@ -45,7 +49,9 @@ class ResonanceApp(customtkinter.CTk):
         self.withdraw()
         self.title(APP_NAME)
         prepare_window(self)
-        self.worker: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=2)
+        # Spotify, album art, weather, sync and sign-in can all be waiting at
+        # once; the first Spotify login holds a worker until it's approved.
+        self.worker: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=4)
         self.song: dict[str, Any] | None = None
         self.song_request_active: bool = False
         self.album_art_url: str | None = None
@@ -56,6 +62,9 @@ class ResonanceApp(customtkinter.CTk):
         self.size_name: str = DEFAULT_SIZE
         self.context_menu: customtkinter.CTkToplevel | None = None
         self.update_check_enabled: bool = True
+        self.account_dialog: AccountDialog | None = None
+        self.sync: SyncEngine = SyncEngine(self)
+        self.sync.listeners.append(self.account_changed)
         # Tk's Entry treats Ctrl+A as "go to line start"; make it select all.
         self.bind_class("Entry", "<Control-a>", self.select_all)
         # A second launch of the app asks this copy to show the hub.
@@ -63,6 +72,8 @@ class ResonanceApp(customtkinter.CTk):
 
         self.open_hub()
         self.poll_song()
+        if self.sync.session is None and not load_device_setting("account_prompted"):
+            self.after(800, self.prompt_for_account)
 
     def open_hub(self) -> None:
         if self.hub is None:
@@ -107,6 +118,52 @@ class ResonanceApp(customtkinter.CTk):
         event.widget.select_range(0, "end")
         event.widget.icursor("end")
         return "break"
+
+    # Accounts and sync
+
+    def prompt_for_account(self) -> None:
+        """Offer sign-in once per device, on first launch."""
+        save_device_setting("account_prompted", True)
+        if self.hub is not None and self.sync.session is None:
+            self.open_account(self.hub)
+
+    def open_account(self, parent: customtkinter.CTkToplevel) -> None:
+        if self.account_dialog is not None and self.account_dialog.winfo_exists():
+            self.account_dialog.lift()
+            return
+        self.account_dialog = AccountDialog(parent, self)
+
+    def account_label(self) -> tuple[str, bool]:
+        """Header text for the account button, and whether it's a problem."""
+        session = self.sync.session
+        if session is None:
+            return "sign in", False
+        name = display_name() or session.email.split("@")[0]
+        marks = {"syncing": "~", "offline": "!", "error": "!"}
+        mark = marks.get(self.sync.status, "")
+        return f"{name} {mark}".strip(), self.sync.status in ("offline", "error")
+
+    def account_changed(self) -> None:
+        if self.hub is not None:
+            self.hub.show_account()
+
+    def profile_changed(self) -> None:
+        self.account_changed()
+        if self.player is not None and self.song is not None:
+            self.player.show_song(self.song)
+
+    def data_changed(self, kinds: set[str]) -> None:
+        """Synced data changed underneath the UI; refresh what shows it."""
+        hub = self.hub
+        if hub is not None:
+            if "task" in kinds:
+                hub.todo_panel.reload()
+            if "event" in kinds and hub.calendar_page is not None:
+                hub.calendar_page.reload()
+            if "setting" in kinds:
+                hub.weather_panel.reload()
+        if "profile" in kinds:
+            self.profile_changed()
 
     def windows(self) -> list[HubWindow | PlayerWindow]:
         return [window for window in (self.hub, self.player) if window]
