@@ -45,6 +45,8 @@ class ResonanceApp(customtkinter.CTk):
         self.album_art_image: Image.Image = render_ascii_art(None)
         self.hub: HubWindow | None = None
         self.player: PlayerWindow | None = None
+        # Tk's Entry treats Ctrl+A as "go to line start"; make it select all.
+        self.bind_class("Entry", "<Control-a>", self.select_all)
         # A second launch of Resonance asks this copy to show the hub.
         self.instance_server = listen(lambda: self.after(0, self.open_hub))
 
@@ -87,6 +89,12 @@ class ResonanceApp(customtkinter.CTk):
         if self.instance_server is not None:
             self.instance_server.close()
         self.destroy()
+        return "break"
+
+    @staticmethod
+    def select_all(event: tk.Event[tk.Entry]) -> str:
+        event.widget.select_range(0, "end")
+        event.widget.icursor("end")
         return "break"
 
     def windows(self) -> list[HubWindow | PlayerWindow]:
