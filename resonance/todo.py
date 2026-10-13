@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 
-from .setup import CONFIG_PATH
+from .paths import DATA_DIR
 
-TODO_PATH = CONFIG_PATH.with_name("todo.json")
+TODO_PATH = DATA_DIR / "todo.json"
 
 
 @dataclass

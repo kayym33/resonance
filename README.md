@@ -1,192 +1,168 @@
 # t1ld3
 
-t1ld3 is a small Windows desktop companion for Spotify. It shows the
-currently playing track in a compact window and gives you quick playback
-controls without opening the full Spotify window.
+t1ld3 (formerly Resonance) is a small desktop hub for Windows and Linux,
+drawn in a monochrome, ASCII-art terminal style. One window holds a command
+launcher, what's playing on Spotify, the weather, a to-do list and a
+calendar. The Spotify player can pop out into its own always-on-top window
+that stays open when you close the hub.
 
 ## What you can do
 
-- See the current song, artist, album artwork, progress, and duration.
-- Play or pause the current track.
-- Skip to the previous or next track.
-- Adjust the Spotify device volume with the volume slider.
-- Seek within the current track with the playback slider.
-- Keep the player window on top of other windows.
-- Open Spotify, refresh the current track, or exit from the right-click menu.
-- Display rotating quotes beneath the playback time.
+- **Launcher.** Type a command at the `>` prompt to open apps and folders,
+  search the web, play a song, add a to-do or do quick sums.
+- **Now playing.** See the current track as dithered ASCII album art, and
+  skip, play or pause.
+- **Player.** Pop out a compact, always-on-top player with seek and volume
+  controls.
+- **Weather.** Current conditions for your city.
+- **To-do list.** Add, tick off and clear tasks.
+- **Calendar.** Today, 3-day, week and month views. Double-click to add an
+  event.
 
 ## Requirements
 
 - Windows or Linux
-- A Spotify account
-- Spotify installed and signed in on at least one device
+- A Spotify account, added to t1ld3's Spotify app by its owner (see below)
 - Spotify Premium for playback controls
 - An internet connection
 
-## First-time setup
-
-Before opening t1ld3, create a Spotify developer application:
-
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-   and sign in.
-2. Create an application and choose **Web API** if Spotify asks which
-   product you want to use.
-3. Open the application's settings and add this redirect URI exactly:
-
-   ```text
-   http://127.0.0.1:8888/callback
-   ```
-
-   Do not replace `127.0.0.1` with `localhost`.
-4. Copy the application's **Client ID** and **Client Secret**. Keep the
-   secret private.
-
 ## Start t1ld3
 
-### Using the Windows executable
+### Windows executable
 
-The included `t1ld3.exe` is for Windows. Double-click it to start the
-application. If Windows displays a security warning, verify that the file came
-from the person or location you trust before choosing **Run**.
+Download `t1ld3.exe` from the latest
+[GitHub Release](https://github.com/kayym33/resonance/releases/latest) and
+double-click it. If Windows shows a security warning, check that the file came
+from that page before choosing **Run**.
 
-### Using the Python version on Windows
+### Python version (Windows or Linux)
 
-If you received the source-code version instead of the executable, install
-Python 3.10 or newer, open PowerShell in the t1ld3 folder, and run:
-
-```powershell
-py -m pip install spotipy customtkinter pillow
-py main.py
-```
-
-### Using the Python version on Linux
-
-Install Python, Tkinter, and virtual-environment support. On Ubuntu or Debian,
-run:
+Install Python 3.10 or newer. On Ubuntu or Debian, also install Tkinter and
+virtual-environment support:
 
 ```bash
-sudo apt update
 sudo apt install python3 python3-pip python3-venv python3-tk
 ```
 
-Then, from the t1ld3 folder, create an environment and start the app:
+Then, from the project folder:
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 python -m pip install spotipy customtkinter pillow
 python main.py
 ```
 
-The Windows `.exe` is not required on Linux; run the Python version instead.
+## Sign in to Spotify
 
-## Update the Windows app
+The first time t1ld3 starts, your browser opens Spotify's sign-in page.
+Approve access and return to t1ld3. You only do this once per computer.
 
-Windows executable updates are published through GitHub Releases. When a pull
-request is merged into `main`, GitHub Actions automatically:
+t1ld3 uses one shared Spotify app, and while that app is in Spotify's
+Development mode, only people its owner has added can sign in. If the browser
+says you aren't allowed, ask the owner to add you.
 
-1. Increments the patch version, such as `0.1.1` to `0.1.2`.
-2. Commits the new `APP_VERSION` back to `main`.
-3. Builds `t1ld3.exe` on a Windows runner.
-4. Creates a matching GitHub Release, such as `v0.1.2`.
+**Owner:** in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
+open the app, go to **User Management**, and add the person's name and the
+email address of their Spotify account. Spotify allows up to 25 people. The
+app's redirect URIs must include `http://127.0.0.1:8888/callback` exactly
+(`localhost` doesn't count as the same address).
 
-Users can then right-click the Windows app and choose **Check for updates**.
-After they confirm, t1ld3 downloads the new executable, closes, replaces
-it, and starts the updated version. Updates are downloaded only after the user
-confirms the prompt.
+## Using the hub
 
-## Connect your Spotify account
+### Launcher
 
-The first time t1ld3 starts, it asks for:
+Start typing in the `>` prompt. Use **Up**/**Down** to pick a suggestion,
+**Enter** to run it, **Tab** to fill it in and **Esc** to clear.
 
-- **Spotify Client ID** — from your Spotify developer application.
-- **Spotify Client Secret** — from the same application.
-- **Redirect URI** — leave this as:
-
-  ```text
-  http://127.0.0.1:8888/callback
-  ```
-
-Choose **Save and continue**, then approve access in the browser window that
-opens. Return to t1ld3 after authorization.
-
-If your Spotify application is in Development mode, the Spotify account you
-use must be added as a test user in the application's dashboard.
-
-## Controls
-
-| Action | How to use it |
+| Type | What happens |
 | --- | --- |
-| Previous track | Select `⏮` |
-| Play or pause | Select `▶` or `⏸` |
-| Next track | Select `⏭` |
-| Playback position | Drag the progress slider |
-| Volume | Drag the volume slider |
-| More options | Right-click anywhere in the window |
-| About t1ld3 | Right-click, then select **About t1ld3** |
-| Change size | Right-click, then choose **Size** and select **Small**, **Medium**, or **Large** |
-| Close t1ld3 | Use the window close button, **Exit**, `Ctrl+Q`, or `Escape` |
+| `zen`, `term` | Open Zen browser or a terminal |
+| `p <project>` | Open a project from `~/Projects` in a terminal and VS Code |
+| `files <folder>` | Open a folder in the file manager |
+| `g <search>`, `yt <search>` | Search the web or YouTube |
+| `play <song>` | Play the top Spotify result |
+| `todo <task>` | Add a to-do |
+| `= 12*7` | Calculate; **Enter** copies the answer |
+| `cal`, `home` | Switch hub pages |
+| `player`, `quit` | Pop out the player, or quit |
 
-Playback controls work only when Spotify Premium is active and Spotify has an
-available playback device. Open Spotify, select a device, and try again if
-the controls do not respond.
+Anything else becomes a web search. The commands live in `commands.json` in
+the data folder (see below), and you can add your own. `{args}` is replaced
+by whatever you type after the command name. Changes take effect the next
+time you click into the prompt.
 
-In **Small** mode, move the pointer over the bottom 20% of the window to
-reveal the playback buttons.
+### Keyboard shortcut
 
-## Your credentials and privacy
+Starting t1ld3 while it's already running brings the hub to the front, so you
+can put the launcher on a key. In GNOME, open **Settings → Keyboard → Custom
+Shortcuts** and add a shortcut that runs:
 
-t1ld3 stores the Spotify application details locally on your computer at:
-
-```text
-%LOCALAPPDATA%\t1ld3\spotify.json
+```bash
+/path/to/project/.venv/bin/python /path/to/project/main.py
 ```
 
-The application uses Spotify authorization to access your playback
-information. It does not include your credentials in the executable.
+### Weather
 
-Never share your Spotify Client Secret or authorization cache. If you are
-using a copy of t1ld3 from someone else, create and use your own Spotify
-developer application.
+On first run, the weather panel asks whether to share your location. Sharing
+looks up your nearest city from your IP address (through ipinfo.io) each
+time t1ld3 starts. Otherwise, type a city. Use **change** to switch later.
+Forecasts come from [Open-Meteo](https://open-meteo.com).
+
+### Calendar
+
+Switch to the **calendar** tab. Double-click an empty slot to add an event,
+or a day in month view. Leave the start time empty for an all-day event.
+Click an event to edit or delete it.
+
+### Menu and player
+
+Right-click anywhere in the hub or the player for more options:
+
+- pop out the player, or open the hub
+- open Spotify and refresh the current song
+- change the size
+- check for updates, and About
+- close the window, or quit
+
+Closing the hub leaves the player running. t1ld3 quits once both windows are
+closed. **Ctrl+Q** quits from either window.
+
+## Your data
+
+Everything is stored on your computer in the data folder:
+
+| System | Folder |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\t1ld3` |
+| Linux | `~/t1ld3` |
+
+The folder holds `todo.json`, `events.json`, `commands.json`,
+`settings.json` and your Spotify sign-in token (`spotify-token.json`). Don't
+share the token. A `Resonance` folder from an older version is moved here
+automatically.
+
+## Updates (Windows)
+
+When a pull request is merged into `main`, GitHub Actions bumps the patch
+version, builds `t1ld3.exe` and publishes a GitHub Release. Right-click and
+choose **Check for updates**. After you confirm, t1ld3 downloads the new
+version, closes, replaces itself and restarts. Releases also include a copy named
+`Resonance.exe`, so that copies installed before the rename can update too.
 
 ## Troubleshooting
 
-### The setup window keeps appearing
+### The browser says I can't sign in to Spotify
 
-Check that the Client ID and Client Secret are correct, then save them again.
-If you are using the Python version, make sure the three `SPOTIPY_*`
-environment variables are set in the same PowerShell window used to start the
-app.
+Your Spotify account needs to be added to the app by its owner. See
+[Sign in to Spotify](#sign-in-to-spotify).
 
-### Authorization fails
+### Playback controls don't work
 
-Confirm that the redirect URI in the Spotify Developer Dashboard matches this
-value exactly:
+Playback controls need Spotify Premium and an active device. Open Spotify,
+play something on a device, then try again.
 
-```text
-http://127.0.0.1:8888/callback
-```
+### Sign in with a different Spotify account
 
-Also confirm that your Spotify account is listed as a test user when the
-developer application is in Development mode.
-
-### Playback controls do not work
-
-Playback controls require Spotify Premium and an active Spotify device. Open
-Spotify, select a device, and then try the control again.
-
-### Album artwork does not load
-
-Check your internet connection. Artwork is downloaded from Spotify when the
-track changes.
-
-### Start over with a different Spotify account
-
-Close t1ld3 and delete this file:
-
-```text
-%LOCALAPPDATA%\t1ld3\spotify.json
-```
-
-Start t1ld3 again and enter the credentials for the Spotify developer
-application you want to use.
+Quit t1ld3, delete `spotify-token.json` from the data folder, then start
+t1ld3 again.

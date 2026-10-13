@@ -13,6 +13,10 @@ APP_AUTHOR = "kayla"
 APP_EMAIL = "kayla.mcdade.2023@uni.strath.ac.uk"
 APP_REPOSITORY = "https://github.com/kayym33/resonance"
 MIN_LOADING_TIME: float = 1
+# Public by design: Spotify's PKCE login needs no client secret. People
+# must still be added under User Management in the Spotify dashboard.
+SPOTIFY_CLIENT_ID = "27ad76d41d944e17b2a571fd559f0e32"
+SPOTIFY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
 GITHUB_RELEASES_API = (
     "https://api.github.com/repos/kayym33/resonance/releases/latest"
 )

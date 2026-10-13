@@ -13,9 +13,9 @@ from typing import Any
 from urllib.parse import quote_plus
 
 from .constants import APP_NAME
-from .setup import CONFIG_PATH
+from .paths import DATA_DIR
 
-COMMANDS_PATH = CONFIG_PATH.with_name("commands.json")
+COMMANDS_PATH = DATA_DIR / "commands.json"
 MAX_SUGGESTIONS = 6
 
 # Written to commands.json on first run so the user can edit them.

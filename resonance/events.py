@@ -12,9 +12,9 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 
-from .setup import CONFIG_PATH
+from .paths import DATA_DIR
 
-EVENTS_PATH = CONFIG_PATH.with_name("events.json")
+EVENTS_PATH = DATA_DIR / "events.json"
 DEFAULT_DURATION = timedelta(hours=1)
 TIME_PATTERN = re.compile(r"^(\d{1,2})(?::?(\d{2}))?$")
 

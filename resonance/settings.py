@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .setup import CONFIG_PATH
+from .paths import DATA_DIR
 
-SETTINGS_PATH = CONFIG_PATH.with_name("settings.json")
+SETTINGS_PATH = DATA_DIR / "settings.json"
 
 
 def load_settings() -> dict[str, Any]:

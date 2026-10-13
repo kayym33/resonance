@@ -5,10 +5,15 @@ import time
 from typing import Any
 
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+from spotipy.cache_handler import CacheFileHandler
+from spotipy.oauth2 import SpotifyPKCE
+
+from .constants import SPOTIFY_CLIENT_ID, SPOTIFY_REDIRECT_URI
+from .paths import DATA_DIR
 
 REFRESH_TIME: int = 1
 SPOTIFY_REFRESH_TIME: int = 5
+SPOTIFY_TOKEN_PATH = DATA_DIR / "spotify-token.json"
 
 
 def get_time() -> str:
@@ -29,7 +34,18 @@ def get_spotify_client() -> spotipy.Spotify:
         "user-read-playback-state "
         "user-modify-playback-state"
     )
-    return spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+    # PKCE signs in through the browser without a client secret. The
+    # environment variables let a developer test against another app.
+    auth_manager = SpotifyPKCE(
+        client_id=os.environ.get("SPOTIPY_CLIENT_ID", SPOTIFY_CLIENT_ID),
+        redirect_uri=os.environ.get(
+            "SPOTIPY_REDIRECT_URI",
+            SPOTIFY_REDIRECT_URI,
+        ),
+        scope=scope,
+        cache_handler=CacheFileHandler(cache_path=str(SPOTIFY_TOKEN_PATH)),
+    )
+    return spotipy.Spotify(auth_manager=auth_manager)
 
 
 spotify: spotipy.Spotify = get_spotify_client()
