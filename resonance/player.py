@@ -6,28 +6,20 @@ import sys
 import time
 import tkinter as tk
 import webbrowser
-import ctypes
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future
 from pathlib import Path
-from io import BytesIO
 from tkinter import messagebox
-from typing import Any
-from urllib.request import urlopen
+from typing import TYPE_CHECKING, Any
 
 import customtkinter
 from PIL import Image
 from .backend import (
     REFRESH_TIME,
-    SPOTIFY_REFRESH_TIME,
-    get_current_song,
     get_time,
-    next_song,
-    previous_song,
     seek_playback,
     set_volume,
-    toggle_playback,
 )
-from .ascii_art import drift_noise, noise_line, render_ascii_art
+from .ascii_art import drift_noise, noise_line
 from .constants import (
     ACCENT,
     ACCENT_DARK,
@@ -49,11 +41,16 @@ from .constants import (
     MIN_LOADING_TIME
 )
 from . import updater
+from .windows import cancel_pending_after, outline_width, prepare_window
+
+if TYPE_CHECKING:
+    from .app import ResonanceApp
 
 
-class ResonanceApp(customtkinter.CTk):
-    def __init__(self) -> None:
-        super().__init__()
+class PlayerWindow(customtkinter.CTkToplevel):
+    def __init__(self, app: ResonanceApp) -> None:
+        super().__init__(app)
+        self.app: ResonanceApp = app
         self.size_var: tk.StringVar = tk.StringVar(value="100")
         self.current_size_name: str = "100"
         self.smallest_size_name: str = next(iter(APP_SIZES))
@@ -63,19 +60,15 @@ class ResonanceApp(customtkinter.CTk):
         self.title("Resonance")
         self.attributes("-topmost", True)
         self.configure(fg_color=BACKGROUND)
+        self.protocol("WM_DELETE_WINDOW", self.close_window)
         self.bind("<Map>", self.restore_topmost)
-        self.bind_all("<Button-3>", self.show_context_menu)
-        self.bind_all("<Motion>", self.handle_pointer_motion)
-        self.bind_all("<Control-q>", self.close_app)
-        self.bind_all("<Escape>", self.close_app)
-        if os.name == "nt":
-            icon_path: Path = (
-                Path(__file__).resolve().parents[1] / "assets" / "icon.ico"
-            )
-            self.iconbitmap(str(icon_path))
+        self.bind("<Button-3>", self.show_context_menu)
+        self.bind("<Motion>", self.handle_pointer_motion)
+        self.bind("<Control-q>", self.app.quit_app)
+        self.bind("<Escape>", self.close_window)
+        prepare_window(self)
         self.drag_start_x: int = 0
         self.drag_start_y: int = 0
-        self.album_art_url: str | None = None
         self.album_art: customtkinter.CTkImage | None = None
         self.progress_ms: int = 0
         self.duration_ms: int = 0
@@ -86,9 +79,6 @@ class ResonanceApp(customtkinter.CTk):
         self.progress_updated_at: float = time.monotonic()
         self.always_on_top: bool = True
         self.always_on_top_var: tk.BooleanVar = tk.BooleanVar(value=True)
-        self.worker: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=2)
-        self.song_request_active: bool = False
-        self.album_art_request_active: bool = False
         self.loading_visible: bool = True
         self.loading_animation_id: str | None = None
         self.loading_progress_id: str | None = None
@@ -147,7 +137,7 @@ class ResonanceApp(customtkinter.CTk):
             corner_radius=0,
         )
         self.album_art_label.pack(expand=True)
-        self.set_album_art(render_ascii_art(None))
+        self.set_album_art(self.app.album_art_image)
 
         self.track_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self,
@@ -286,13 +276,13 @@ class ResonanceApp(customtkinter.CTk):
             width=70,
             height=44,
             corner_radius=0,
-            border_width=self.outline_width(),
+            border_width=outline_width(self),
             border_color=INK,
             fg_color="transparent",
             hover_color=HOVER,
             text_color=INK,
             font=customtkinter.CTkFont(family=MONO_FONT, size=16, weight="bold"),
-            command=self.previous_song,
+            command=self.app.previous_song,
         )
         self.previous_button.pack(side="left", expand=True, padx=5)
 
@@ -307,7 +297,7 @@ class ResonanceApp(customtkinter.CTk):
             hover_color=INK_SOFT,
             text_color=BACKGROUND,
             font=customtkinter.CTkFont(family=MONO_FONT, size=18, weight="bold"),
-            command=self.toggle_playback,
+            command=self.app.toggle_playback,
         )
         self.play_pause_button.pack(side="left", expand=True, padx=5)
 
@@ -317,13 +307,13 @@ class ResonanceApp(customtkinter.CTk):
             width=70,
             height=44,
             corner_radius=0,
-            border_width=self.outline_width(),
+            border_width=outline_width(self),
             border_color=INK,
             fg_color="transparent",
             hover_color=HOVER,
             text_color=INK,
             font=customtkinter.CTkFont(family=MONO_FONT, size=16, weight="bold"),
-            command=self.next_song,
+            command=self.app.next_song,
         )
         self.next_button.pack(side="left", expand=True, padx=5)
 
@@ -370,10 +360,12 @@ class ResonanceApp(customtkinter.CTk):
         self.update_time()
         self.update_noise()
         self.update_quote()
-        self.update_song()
         self.update_progress()
-        self.after(100, self.configure_taskbar_presence)
-        self.after(500, self.configure_taskbar_presence)
+        if self.app.song is not None:
+            # Spotify is already connected, so skip the splash.
+            self.loading_frame.place_forget()
+            self.loading_visible = False
+            self.show_song(self.app.song)
 
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
@@ -390,32 +382,6 @@ class ResonanceApp(customtkinter.CTk):
         self.quote_index = (self.quote_index + 1) % len(QUOTES)
         self.after(30_000, self.update_quote)
 
-    def configure_taskbar_presence(self) -> None:
-        if os.name != "nt":
-            return
-
-        # Remove the tool-window style so Windows groups Resonance in the taskbar.
-        hwnd: int = self.winfo_id()
-        get_window_long = ctypes.windll.user32.GetWindowLongW
-        set_window_long = ctypes.windll.user32.SetWindowLongW
-        set_window_pos = ctypes.windll.user32.SetWindowPos
-        ex_style = get_window_long(hwnd, -20)
-        app_window = 0x00040000
-        tool_window = 0x00000080
-        set_window_long(
-            hwnd,
-            -20,
-            (ex_style | app_window) & ~tool_window,
-        )
-        set_window_pos(
-            hwnd,
-            0,
-            0,
-            0,
-            0,
-            0x0001 | 0x0002 | 0x0020 | 0x0040,
-        )
-
     def start_window_drag(self, event: tk.Event[tk.Misc]) -> None:
         self.drag_start_x = event.x_root - self.winfo_x()
         self.drag_start_y = event.y_root - self.winfo_y()
@@ -426,10 +392,13 @@ class ResonanceApp(customtkinter.CTk):
         self.attributes("-topmost", False)
         self.iconify()
 
-    def close_app(self, _event: tk.Event[tk.Misc] | None = None) -> str:
-        self.worker.shutdown(wait=False, cancel_futures=True)
-        self.destroy()
+    def close_window(self, _event: tk.Event[tk.Misc] | None = None) -> str:
+        self.app.close_player()
         return "break"
+
+    def destroy(self) -> None:
+        cancel_pending_after(self)
+        super().destroy()
 
     def restore_topmost(self, _event: tk.Event[tk.Misc] | None = None) -> None:
         if self.always_on_top:
@@ -451,7 +420,7 @@ class ResonanceApp(customtkinter.CTk):
         menu.configure(fg_color=BACKGROUND)
         _, scaling = APP_SIZES[self.current_size_name]
         menu_width = round(320 / scaling)
-        menu_height = round(340 / scaling)
+        menu_height = round(408 / scaling)
         menu.geometry(
             f"{menu_width}x{menu_height}+{event.x_root}+{event.y_root}"
         )
@@ -462,7 +431,7 @@ class ResonanceApp(customtkinter.CTk):
             menu,
             fg_color=BACKGROUND,
             border_color=INK,
-            border_width=self.outline_width(),
+            border_width=outline_width(self),
             corner_radius=0,
         )
         frame.pack(fill="both", expand=True)
@@ -476,6 +445,7 @@ class ResonanceApp(customtkinter.CTk):
         )
         title.pack(fill="x", padx=8, pady=(10, 5))
 
+        self.add_menu_button(frame, "Open hub", self.app.open_hub)
         self.add_menu_button(frame, "Open Spotify", self.open_spotify)
         self.add_menu_button(
             frame,
@@ -520,10 +490,11 @@ class ResonanceApp(customtkinter.CTk):
         if not self.update_check_enabled:
             update_button.configure(state="disabled")
         self.add_menu_button(frame, "About Resonance", self.show_about)
+        self.add_menu_button(frame, "Close player", self.close_window)
         self.add_menu_button(
             frame,
-            "Exit",
-            self.close_app,
+            "Quit Resonance",
+            self.app.quit_app,
             text_color=ACCENT_DARK,
         )
 
@@ -584,7 +555,7 @@ class ResonanceApp(customtkinter.CTk):
             dialog,
             fg_color=BACKGROUND,
             border_color=INK,
-            border_width=self.outline_width(),
+            border_width=outline_width(self),
             corner_radius=0,
         )
         card.pack(fill="both", expand=True, padx=8, pady=8)
@@ -643,7 +614,10 @@ class ResonanceApp(customtkinter.CTk):
         width = int(geometry.split("x", maxsplit=1)[0])
         self.song_label.configure(wraplength=max(180, width - 40))
         for button in (self.previous_button, self.next_button):
-            button.configure(border_width=self.outline_width())
+            button.configure(border_width=outline_width(self))
+        # Scaling is app-wide, so the hub resizes with the player.
+        if self.app.hub is not None:
+            self.app.hub.refresh_outlines()
         self.user_label.configure(wraplength=max(180, width - 40))
         self.controls_frame.pack_configure(
             pady=(16, 20)
@@ -651,11 +625,6 @@ class ResonanceApp(customtkinter.CTk):
             else (10, 14)
         )
         self.show_controls()
-
-    def outline_width(self) -> int:
-        # CTk scales border widths, so a 1px outline vanishes below 100%.
-        _, scaling = APP_SIZES[self.current_size_name]
-        return 2 if scaling < 1 else 1
 
     def handle_pointer_motion(self, event: tk.Event[tk.Misc]) -> None:
         return
@@ -681,7 +650,7 @@ class ResonanceApp(customtkinter.CTk):
         self.controls_visible = True
 
     def refresh_song(self) -> None:
-        self.update_song()
+        self.app.refresh_song()
 
     def change_volume(self, value: float) -> None:
         if self.volume_update_active:
@@ -693,7 +662,7 @@ class ResonanceApp(customtkinter.CTk):
 
         self.volume_percent = volume_percent
         self.volume_update_active = True
-        future: Future[None] = self.worker.submit(set_volume, volume_percent)
+        future: Future[None] = self.app.worker.submit(set_volume, volume_percent)
         future.add_done_callback(self.volume_update_finished)
 
     def volume_update_finished(self, future: Future[None]) -> None:
@@ -701,6 +670,8 @@ class ResonanceApp(customtkinter.CTk):
 
     def apply_volume_update(self, future: Future[None]) -> None:
         self.volume_update_active = False
+        if not self.winfo_exists():
+            return
         try:
             future.result()
         except Exception:
@@ -731,7 +702,7 @@ class ResonanceApp(customtkinter.CTk):
 
         self.update_check_enabled = False
         self.close_context_menu()
-        self.worker.submit(self.find_update).add_done_callback(
+        self.app.worker.submit(self.find_update).add_done_callback(
             self.update_check_finished
         )
 
@@ -746,6 +717,8 @@ class ResonanceApp(customtkinter.CTk):
         future: Future[tuple[str, str] | None],
     ) -> None:
         self.update_check_enabled = True
+        if not self.winfo_exists():
+            return
         try:
             update = future.result()
         except Exception as error:
@@ -772,7 +745,7 @@ class ResonanceApp(customtkinter.CTk):
             f"Resonance {tag_name} is available. Download and install it now?",
             parent=self,
         ):
-            self.worker.submit(
+            self.app.worker.submit(
                 self.download_update,
                 download_url,
             ).add_done_callback(self.update_download_finished)
@@ -791,30 +764,14 @@ class ResonanceApp(customtkinter.CTk):
                 parent=self,
             )
             return
-        self.close_app()
+        self.app.quit_app()
 
-    def update_song(self) -> None:
-        if self.song_request_active:
-            return
+    def show_song_error(self) -> None:
+        self.artist_label.configure(text="Spotify unavailable :<")
+        self.loading_title.configure(text="Connecting to Spotify...")
+        self.loading_status.configure(text="Please open Spotify and try again ♡")
 
-        self.song_request_active = True
-        future: Future[dict[str, Any]] = self.worker.submit(get_current_song)
-        future.add_done_callback(self.song_request_finished)
-
-    def song_request_finished(self, future: Future[dict[str, Any]]) -> None:
-        self.after(0, self.apply_song_result, future)
-
-    def apply_song_result(self, future: Future[dict[str, Any]]) -> None:
-        self.song_request_active = False
-        try:
-            song: dict[str, Any] = future.result()
-        except Exception:
-            self.artist_label.configure(text="Spotify unavailable :<")
-            self.loading_title.configure(text="Connecting to Spotify...")
-            self.loading_status.configure(text="Please open Spotify and try again ♡")
-            self.after(SPOTIFY_REFRESH_TIME * 1000, self.update_song)
-            return
-
+    def show_song(self, song: dict[str, Any]) -> None:
         username = str(song.get("username") or "Spotify user")
         self.user_label.configure(text=f"hii {username} !")
         self.finish_loading(username)
@@ -836,10 +793,6 @@ class ResonanceApp(customtkinter.CTk):
         if isinstance(volume_percent, (int, float)):
             self.volume_percent = int(volume_percent)
             self.volume_slider.set(self.volume_percent)
-        if song["album_art_url"] != self.album_art_url:
-            self.load_album_art(song["album_art_url"])
-
-        self.after(SPOTIFY_REFRESH_TIME * 1000, self.update_song)
 
     def finish_loading(self, username: str) -> None:
         if not self.loading_visible:
@@ -958,7 +911,7 @@ class ResonanceApp(customtkinter.CTk):
     def seek_to_current_position(self) -> None:
         self.seek_after_id = None
         position_ms = max(0, min(self.progress_ms, self.duration_ms))
-        self.worker.submit(seek_playback, position_ms)
+        self.app.worker.submit(seek_playback, position_ms)
 
     @staticmethod
     def format_time(milliseconds: int) -> str:
@@ -968,53 +921,6 @@ class ResonanceApp(customtkinter.CTk):
         minutes, seconds = divmod(total_seconds, 60)
         return f"{minutes}:{seconds:02d}"
 
-    def load_album_art(self, image_url: str | None) -> None:
-        self.album_art_url = image_url
-        if not image_url:
-            self.set_album_art(render_ascii_art(None))
-            return
-
-        self.album_art_request_active = True
-        future: Future[Image.Image] = self.worker.submit(
-            self.download_album_art,
-            image_url,
-        )
-        future.add_done_callback(
-            lambda completed, requested_url=image_url: (
-                self.album_art_request_finished(completed, requested_url)
-            )
-        )
-
-    @staticmethod
-    def download_album_art(image_url: str) -> Image.Image:
-        with urlopen(image_url, timeout=5) as response:
-            image = Image.open(BytesIO(response.read())).convert("RGB")
-        return render_ascii_art(image, seed=image_url)
-
-    def album_art_request_finished(
-        self,
-        future: Future[Image.Image],
-        requested_url: str,
-    ) -> None:
-        self.after(0, self.apply_album_art, future, requested_url)
-
-    def apply_album_art(
-        self,
-        future: Future[Image.Image],
-        requested_url: str,
-    ) -> None:
-        self.album_art_request_active = False
-        if requested_url != self.album_art_url:
-            return
-
-        try:
-            image: Image.Image = future.result()
-        except Exception:
-            self.set_album_art(render_ascii_art(None))
-            return
-
-        self.set_album_art(image)
-
     def set_album_art(self, image: Image.Image) -> None:
         self.album_art = customtkinter.CTkImage(
             light_image=image,
@@ -1022,31 +928,3 @@ class ResonanceApp(customtkinter.CTk):
             size=(ALBUM_ART_SIZE, ALBUM_ART_SIZE),
         )
         self.album_art_label.configure(image=self.album_art, text="")
-
-    def toggle_playback(self) -> None:
-        self.worker.submit(toggle_playback)
-        self.after(250, self.update_song)
-
-    def previous_song(self) -> None:
-        self.worker.submit(previous_song)
-        self.after(250, self.update_song)
-
-    def next_song(self) -> None:
-        self.worker.submit(next_song)
-        self.after(250, self.update_song)
-
-    def run(self) -> None:
-        self.mainloop()
-
-
-def create_app() -> ResonanceApp:
-    customtkinter.set_appearance_mode("light")
-    theme_path = (
-        Path(__file__).resolve().parents[1] / "assets" / "terminal_theme.json"
-    )
-    customtkinter.set_default_color_theme(str(theme_path))
-    if os.name == "nt":
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "resonance.app"
-        )
-    return ResonanceApp()
