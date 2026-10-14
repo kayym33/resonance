@@ -76,6 +76,8 @@ class HubWindow(customtkinter.CTkToplevel):
         self.bind("<Control-q>", self.app.quit_app)
         self.bind("<Control-w>", self.close_window)
         self.bind("<Button-3>", self.show_context_menu)
+        # A left click anywhere else in the window closes an open menu.
+        self.bind("<Button-1>", lambda _event: self.app.close_context_menu())
         self.bind("<F11>", lambda _event: self.toggle_fullscreen())
         self.bind("<Escape>", self.exit_fullscreen)
         self.bind("<Configure>", self.on_configure)

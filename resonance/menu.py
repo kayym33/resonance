@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tkinter as tk
 from dataclasses import dataclass
 from typing import Callable
 
@@ -49,12 +50,12 @@ def build_context_menu(
     its reference to the menu before the command runs.
     """
     menu = customtkinter.CTkToplevel(owner)
+    # Hidden while it's built and measured, so it never flashes in the
+    # wrong place.
+    menu.withdraw()
     menu.overrideredirect(True)
     menu.attributes("-topmost", True)
     menu.configure(fg_color=BACKGROUND)
-    # Position only: CTk scales sizes but not screen coordinates, and the
-    # menu sizes itself to its contents.
-    menu.geometry(f"+{x}+{y}")
     menu.bind("<Escape>", lambda _event: on_close())
 
     frame = customtkinter.CTkFrame(
@@ -109,8 +110,60 @@ def build_context_menu(
         fg_color="transparent",
     ).pack(padx=8, pady=(0, 6))
 
+    # Position only (the menu sizes itself to its contents), in raw screen
+    # pixels, which CTk doesn't scale.
+    tk.Wm.wm_geometry(menu, "+{}+{}".format(*fit_on_screen(menu, x, y)))
+    menu.deiconify()
+    close_when_focus_leaves(menu, on_close)
     menu.focus_force()
     return menu
+
+
+def fit_on_screen(menu: tk.Misc, x: int, y: int) -> tuple[int, int]:
+    """Open up and/or left of the pointer when there's no room below or to
+    the right of it, so the whole menu stays on screen."""
+    menu.update_idletasks()
+    width, height = menu.winfo_reqwidth(), menu.winfo_reqheight()
+    screen_width, screen_height = menu.winfo_screenwidth(), menu.winfo_screenheight()
+    if x + width > screen_width:
+        x -= width
+    if y + height > screen_height:
+        y -= height
+    return (
+        max(0, min(x, screen_width - width)),
+        max(0, min(y, screen_height - height)),
+    )
+
+
+def close_when_focus_leaves(menu: tk.Misc, on_close: Callable[[], None]) -> None:
+    """Close the menu when the user clicks anywhere else, including other
+    apps. Only armed once the menu has actually been focused, so it can't
+    close the moment it opens. Clicks on t1ld3's own windows are also
+    caught by their <Button-1> bindings, for desktops that never give a
+    borderless window focus."""
+    armed = False
+
+    def focus_in(_event: tk.Event[tk.Misc]) -> None:
+        nonlocal armed
+        armed = True
+
+    def focus_out(_event: tk.Event[tk.Misc]) -> None:
+        # Let the focus settle, then check where it went.
+        if armed:
+            menu.after(50, close_if_unfocused)
+
+    def close_if_unfocused() -> None:
+        if not menu.winfo_exists():
+            return
+        try:
+            focused = menu.focus_get()
+        except (KeyError, tk.TclError):
+            focused = None
+        if focused is None or focused.winfo_toplevel() is not menu:
+            on_close()
+
+    menu.bind("<FocusIn>", focus_in)
+    menu.bind("<FocusOut>", focus_out)
 
 
 def add_size_row(

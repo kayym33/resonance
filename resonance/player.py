@@ -55,6 +55,8 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.close_window)
         self.bind("<Map>", self.restore_topmost)
         self.bind("<Button-3>", self.show_context_menu)
+        # A left click anywhere else in the window closes an open menu.
+        self.bind("<Button-1>", lambda _event: self.app.close_context_menu())
         self.bind("<Motion>", self.handle_pointer_motion)
         self.bind("<Control-q>", self.app.quit_app)
         self.bind("<Escape>", self.close_window)
