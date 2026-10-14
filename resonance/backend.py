@@ -5,10 +5,17 @@ import time
 from typing import Any
 
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+from spotipy.cache_handler import CacheFileHandler
+from spotipy.oauth2 import SpotifyPKCE
+
+from .constants import SPOTIFY_CLIENT_ID, SPOTIFY_REDIRECT_URI
+from .paths import DATA_DIR
 
 REFRESH_TIME: int = 1
 SPOTIFY_REFRESH_TIME: int = 5
+# Redraw the player's progress bar at about 60 frames a second.
+PROGRESS_FRAME_MS: int = 16
+SPOTIFY_TOKEN_PATH = DATA_DIR / "spotify-token.json"
 
 
 def get_time() -> str:
@@ -29,7 +36,18 @@ def get_spotify_client() -> spotipy.Spotify:
         "user-read-playback-state "
         "user-modify-playback-state"
     )
-    return spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+    # PKCE signs in through the browser without a client secret. The
+    # environment variables let a developer test against another app.
+    auth_manager = SpotifyPKCE(
+        client_id=os.environ.get("SPOTIPY_CLIENT_ID", SPOTIFY_CLIENT_ID),
+        redirect_uri=os.environ.get(
+            "SPOTIPY_REDIRECT_URI",
+            SPOTIFY_REDIRECT_URI,
+        ),
+        scope=scope,
+        cache_handler=CacheFileHandler(cache_path=str(SPOTIFY_TOKEN_PATH)),
+    )
+    return spotipy.Spotify(auth_manager=auth_manager)
 
 
 spotify: spotipy.Spotify = get_spotify_client()
@@ -112,3 +130,15 @@ def seek_playback(position_ms: int) -> None:
 
 def set_volume(volume_percent: int) -> None:
     spotify.volume(max(0, min(100, volume_percent)))
+
+
+def play_search(query: str) -> str:
+    """Play the top Spotify track for a search and describe what started."""
+    results = spotify.search(q=query, type="track", limit=1)
+    tracks: list[dict[str, Any]] = results.get("tracks", {}).get("items", [])
+    if not tracks:
+        raise LookupError(f'no tracks found for "{query}"')
+    track = tracks[0]
+    spotify.start_playback(uris=[track["uri"]])
+    artist = ", ".join(artist["name"] for artist in track["artists"])
+    return f"{track['name']} by {artist}"
