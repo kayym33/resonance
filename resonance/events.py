@@ -16,6 +16,8 @@ from .paths import DATA_DIR
 from .store import Collection
 
 DEFAULT_DURATION = timedelta(hours=1)
+# Minutes before the start; events saved before reminders existed get this.
+DEFAULT_REMIND = 10
 TIME_PATTERN = re.compile(r"^(\d{1,2})(?::?(\d{2}))?$")
 
 
@@ -25,6 +27,8 @@ class Event:
     day: date
     start: time | None = None
     end: time | None = None
+    # Minutes before the start to remind, 0 for at the start, None for off.
+    remind: int | None = DEFAULT_REMIND
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     @property
@@ -54,6 +58,7 @@ class Event:
             "day": self.day.isoformat(),
             "start": self.start.strftime("%H:%M") if self.start else None,
             "end": self.end.strftime("%H:%M") if self.end else None,
+            "remind": self.remind,
         }
 
     @classmethod
@@ -66,6 +71,7 @@ class Event:
                 day=date.fromisoformat(data["day"]),
                 start=parse_time(data.get("start") or ""),
                 end=parse_time(data.get("end") or ""),
+                remind=parse_remind(data.get("remind", DEFAULT_REMIND)),
                 id=str(data.get("id") or uuid.uuid4().hex),
             )
         except (KeyError, TypeError, ValueError):
@@ -74,6 +80,15 @@ class Event:
 
 def minutes(value: time) -> int:
     return value.hour * 60 + value.minute
+
+
+def parse_remind(value: object) -> int | None:
+    """A bad reminder falls back to the default rather than losing the event."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return DEFAULT_REMIND
+    return value
 
 
 def parse_time(text: str) -> time | None:

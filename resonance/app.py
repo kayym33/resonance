@@ -34,9 +34,12 @@ from .backend import (
     toggle_playback,
 )
 from .constants import APP_NAME, APP_SIZES, APP_VERSION, DEFAULT_SIZE
+from .events import load_events
 from .hub import HubWindow
 from .instance import listen
 from .menu import MenuItem, build_context_menu
+from . import notify
+from .reminders import due_reminders, prune_sent, reminder_key, reminder_text
 from .settings import (
     load_device_setting,
     load_settings,
@@ -45,6 +48,7 @@ from .settings import (
 )
 from . import theme
 from .sync import SyncEngine
+from .toast import Toast
 from .user_profile import avatar_source, display_name, profile_data
 from .player import PlayerWindow
 from .windows import prepare_window
@@ -53,6 +57,8 @@ from .windows import prepare_window
 # "auto" follows sunrise and sunset; the order is the menu's cycle.
 THEME_CHOICES: tuple[str, ...] = ("auto", "night", "day")
 THEME_CHECK_MS = 60_000
+REMINDER_CHECK_MS = 20_000
+REMINDER_FIRST_CHECK_MS = 3_000
 DAY_START_HOUR, DAY_END_HOUR = 7, 19
 
 
@@ -87,6 +93,16 @@ class ResonanceApp(customtkinter.CTk):
         self.avatar_cache: tuple[object, ThemedImage, ThemedImage] | None = None
         self.sync: SyncEngine = SyncEngine(self)
         self.sync.listeners.append(self.account_changed)
+        # Reminders already shown on this device, kept across restarts so
+        # relaunching doesn't repeat them.
+        sent = load_device_setting("reminders_sent", [])
+        self.reminders_sent: set[str] = prune_sent(
+            {key for key in sent if isinstance(key, str)}
+            if isinstance(sent, list)
+            else set(),
+            datetime.now().date(),
+        )
+        self.toasts: list[Toast] = []
         # Tk's Entry treats Ctrl+A as "go to line start"; make it select all.
         self.bind_class("Entry", "<Control-a>", self.select_all)
         # A second launch of the app asks this copy to show the hub.
@@ -96,6 +112,7 @@ class ResonanceApp(customtkinter.CTk):
         self.open_hub()
         self.poll_song()
         self.after(THEME_CHECK_MS, self.theme_tick)
+        self.after(REMINDER_FIRST_CHECK_MS, self.reminder_tick)
         if self.sync.session is None and not load_device_setting("account_prompted"):
             self.after(800, self.prompt_for_account)
 
@@ -232,6 +249,38 @@ class ResonanceApp(customtkinter.CTk):
     def theme_tick(self) -> None:
         self.update_theme()
         self.after(THEME_CHECK_MS, self.theme_tick)
+
+    # Event reminders
+
+    def reminder_tick(self) -> None:
+        self.check_reminders()
+        self.after(REMINDER_CHECK_MS, self.reminder_tick)
+
+    def check_reminders(self) -> None:
+        now = datetime.now()
+        due = due_reminders(load_events(), now, self.reminders_sent)
+        if not due:
+            return
+        for event in due:
+            self.reminders_sent.add(reminder_key(event))
+            title, body = reminder_text(event, now)
+            self.worker.submit(notify.send, title, body).add_done_callback(
+                lambda future, title=title, body=body: self.after(
+                    0, self.reminder_sent, future, title, body
+                )
+            )
+        self.reminders_sent = prune_sent(self.reminders_sent, now.date())
+        save_device_setting("reminders_sent", sorted(self.reminders_sent))
+
+    def reminder_sent(self, future: Future[bool], title: str, body: str) -> None:
+        """Show the reminder in a corner of the screen if the system
+        couldn't."""
+        try:
+            shown = future.result()
+        except Exception:
+            shown = False
+        if not shown:
+            Toast(self, title, body, self.toasts)
 
     def data_changed(self, kinds: set[str]) -> None:
         """Synced data changed underneath the UI; refresh what shows it."""
