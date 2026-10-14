@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import time
 import tkinter as tk
 from typing import TYPE_CHECKING, Any
 
@@ -18,6 +20,7 @@ from .constants import (
     MUTED,
 )
 from .calendar_page import CalendarPage
+from .idle_view import IdleView
 from .launcher_panel import LauncherPanel
 from .menu import SIZE_ROW, MenuItem
 from .noise_band import NoiseBand
@@ -37,8 +40,10 @@ if TYPE_CHECKING:
 
 HUB_SIZE = (820, 770)
 HUB_GEOMETRY = f"{HUB_SIZE[0]}x{HUB_SIZE[1]}"
+# Full screen swaps the hub for a big clock after this long untouched.
+IDLE_AFTER_S = 30
+ACTIVITY_CHECK_MS = 500
 # Star density around the hub in full screen.
-WM_SETTLE_MS = 50
 BACKDROP_DENSITY = 0.12
 # Wide enough to run off both edges of the window.
 NOISE_COLUMNS = 170
@@ -63,7 +68,9 @@ class HubWindow(customtkinter.CTkToplevel):
         self.app: ResonanceApp = app
         self.title(APP_NAME)
         self.geometry(HUB_GEOMETRY)
-        self.resizable(False, False)
+        # Resizable (so the title bar has a maximize button, which goes full
+        # screen) but never smaller than the hub's layout.
+        self.minsize(*HUB_SIZE)
         self.configure(fg_color=BACKGROUND)
         self.protocol("WM_DELETE_WINDOW", self.close_window)
         self.bind("<Control-q>", self.app.quit_app)
@@ -71,6 +78,11 @@ class HubWindow(customtkinter.CTkToplevel):
         self.bind("<Button-3>", self.show_context_menu)
         self.bind("<F11>", lambda _event: self.toggle_fullscreen())
         self.bind("<Escape>", self.exit_fullscreen)
+        self.bind("<Configure>", self.on_configure)
+        # Activity that keeps full screen from going idle. Pointer movement
+        # is polled in check_activity instead of bound.
+        for sequence in ("<KeyRelease>", "<ButtonRelease>", "<MouseWheel>"):
+            self.bind(sequence, self.note_activity)
         prepare_window(self)
         self.album_art: customtkinter.CTkImage | None = None
         self.fullscreen: bool = False
@@ -87,6 +99,12 @@ class HubWindow(customtkinter.CTkToplevel):
         )
         self.content.pack_propagate(False)
         self.content.pack(fill="both", expand=True)
+        self.idle_view = IdleView(self)
+        # "normal" (packed), "expanded" (centred in stars) or "idle".
+        self.layout: str = "normal"
+        self.idle: bool = False
+        self.last_activity: float = time.monotonic()
+        self.last_pointer: tuple[int, int] | None = None
 
         # Stars that thin out towards the content. The bottom field is
         # packed now so it keeps its place below the pages; the home page
@@ -285,6 +303,7 @@ class HubWindow(customtkinter.CTkToplevel):
         # The suggestion dropdown floats above the panels packed after it.
         self.launcher.dropdown.lift()
         self.after(150, self.focus_launcher)
+        self.after(ACTIVITY_CHECK_MS, self.check_activity)
 
     def show_page(self, name: str) -> None:
         if name == "calendar" and self.calendar_page is None:
@@ -334,7 +353,11 @@ class HubWindow(customtkinter.CTkToplevel):
     def exit_fullscreen(self, _event: tk.Event[tk.Misc] | None = None) -> str | None:
         if not self.fullscreen:
             return None
-        self.set_fullscreen(False)
+        if self.idle:
+            # The first Esc just wakes the hub back up.
+            self.note_activity()
+        else:
+            self.set_fullscreen(False)
         return "break"
 
     def set_fullscreen(self, fullscreen: bool) -> None:
@@ -342,28 +365,93 @@ class HubWindow(customtkinter.CTkToplevel):
             return
         self.fullscreen = fullscreen
         if fullscreen:
-            # Window managers won't fill the screen with a fixed-size window,
-            # and the "resizable" change has to reach them before the
-            # full-screen request does, hence update_idletasks and a pause.
-            self.resizable(True, True)
+            self.note_activity()
             self.update_idletasks()
-            self.after(WM_SETTLE_MS, lambda: self.attributes("-fullscreen", True))
-            self.content.pack_forget()
-            self.backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
-            self.content.place(relx=0.5, rely=0.5, anchor="center")
+            self.attributes("-fullscreen", True)
         else:
-            self.backdrop.place_forget()
-            self.content.place_forget()
-            self.content.pack(fill="both", expand=True)
+            self.set_idle(False)
             self.attributes("-fullscreen", False)
             self.update_idletasks()
-            self.after(WM_SETTLE_MS, self.restore_window_size)
+            self.geometry(HUB_GEOMETRY)
+        self.apply_layout()
+
+    def on_configure(self, event: tk.Event[tk.Misc]) -> None:
+        if event.widget is not self:
+            return  # Children's resizes bubble up here too.
+        if not self.fullscreen and self.is_maximized():
+            # The title bar's maximize button means full screen here.
+            self.after_idle(self.maximize_to_fullscreen)
+            return
+        self.apply_layout()
+
+    def is_maximized(self) -> bool:
+        if os.name == "nt":
+            return self.state() == "zoomed"
+        try:
+            return bool(self.attributes("-zoomed"))
+        except tk.TclError:
+            return False
+
+    def maximize_to_fullscreen(self) -> None:
+        if os.name == "nt":
+            self.state("normal")
+        else:
+            self.attributes("-zoomed", False)
+        self.set_fullscreen(True)
+
+    def apply_layout(self) -> None:
+        """Pack the hub normally, or centre it (or the idle clock) in a
+        field of stars when the window is full screen or bigger than it."""
+        expanded = (
+            self.fullscreen
+            or self.winfo_width() > self.content.winfo_reqwidth() + 4
+            or self.winfo_height() > self.content.winfo_reqheight() + 4
+        )
+        layout = "idle" if self.idle else "expanded" if expanded else "normal"
+        if layout == self.layout:
+            return
+        self.layout = layout
+        for widget in (self.content, self.idle_view, self.backdrop):
+            widget.pack_forget()
+            widget.place_forget()
+        if layout == "normal":
+            self.content.pack(fill="both", expand=True)
+        else:
+            self.backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
+            shown = self.idle_view if layout == "idle" else self.content
+            shown.place(relx=0.5, rely=0.5, anchor="center")
         self.launcher.dropdown.lift()
 
-    def restore_window_size(self) -> None:
-        if not self.fullscreen:
-            self.geometry(HUB_GEOMETRY)
-            self.resizable(False, False)
+    # Idle clock (full screen only)
+
+    def note_activity(self, _event: tk.Event[tk.Misc] | None = None) -> None:
+        self.last_activity = time.monotonic()
+        if self.idle:
+            self.set_idle(False)
+
+    def check_activity(self) -> None:
+        if self.fullscreen:
+            pointer = self.winfo_pointerxy()
+            if pointer != self.last_pointer:
+                self.last_pointer = pointer
+                self.note_activity()
+            elif (
+                not self.idle
+                and time.monotonic() - self.last_activity >= IDLE_AFTER_S
+            ):
+                self.set_idle(True)
+        self.after(ACTIVITY_CHECK_MS, self.check_activity)
+
+    def set_idle(self, idle: bool) -> None:
+        if idle == self.idle:
+            return
+        self.idle = idle
+        if idle:
+            self.app.close_context_menu()
+            self.idle_view.show_time()
+            self.idle_view.show_song(self.app.song)
+        self.configure(cursor="none" if idle else "")
+        self.apply_layout()
 
     def show_context_menu(self, event: tk.Event[tk.Misc]) -> None:
         self.app.show_context_menu(
@@ -432,6 +520,7 @@ class HubWindow(customtkinter.CTkToplevel):
 
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
+        self.idle_view.show_time()
         self.after(REFRESH_TIME * 1000, self.update_time)
 
     def show_song(self, song: dict[str, Any]) -> None:
@@ -445,6 +534,7 @@ class HubWindow(customtkinter.CTkToplevel):
         self.play_pause_button.configure(
             text="||" if song["is_playing"] else ">"
         )
+        self.idle_view.show_song(song)
 
     def show_song_error(self) -> None:
         self.song_label.configure(text="Spotify unavailable :<")
@@ -458,6 +548,7 @@ class HubWindow(customtkinter.CTkToplevel):
             size=(HUB_ART_SIZE, HUB_ART_SIZE),
         )
         self.album_art_label.configure(image=self.album_art)
+        self.idle_view.set_album_art(images)
 
     def close_window(self, _event: tk.Event[tk.Misc] | None = None) -> str:
         self.app.close_hub()
