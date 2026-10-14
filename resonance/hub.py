@@ -21,6 +21,7 @@ from .calendar_page import CalendarPage
 from .launcher_panel import LauncherPanel
 from .menu import SIZE_ROW, MenuItem
 from .noise_band import NoiseBand
+from .starfield import Starfield
 from .todo_panel import TodoPanel
 from .weather_panel import WeatherPanel
 from .windows import (
@@ -66,17 +67,14 @@ class HubWindow(customtkinter.CTkToplevel):
         prepare_window(self)
         self.album_art: customtkinter.CTkImage | None = None
 
-        # Starfields that thin out towards the content. The bottom one is
-        # packed now so it keeps its place below the pages.
+        # Stars that thin out towards the content. The bottom field is
+        # packed now so it keeps its place below the pages; the home page
+        # fills its own spare space with more, growing denser downwards.
         NoiseBand(self, NOISE_COLUMNS, (0.55, 0.32, 0.16)).pack(
             fill="x",
             pady=(8, 0),
         )
-        NoiseBand(self, NOISE_COLUMNS, (0.08, 0.2, 0.4)).pack(
-            side="bottom",
-            fill="x",
-            pady=(0, 8),
-        )
+        Starfield(self, 0.22, 0.45, height=56).pack(side="bottom", fill="x")
 
         header = customtkinter.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=MARGIN, pady=(8, 0))
@@ -240,8 +238,14 @@ class HubWindow(customtkinter.CTkToplevel):
             self.app,
         )
         self.weather_panel.pack(fill="x")
+        Starfield(weather_column, 0.03, 0.12).pack(
+            fill="both",
+            expand=True,
+            pady=(24, 0),
+        )
         self.todo_panel: TodoPanel = TodoPanel(columns)
         self.todo_panel.pack(side="left", fill="both", expand=True, padx=(40, 0))
+        Starfield(self.home_page, 0.12, 0.22).pack(fill="both", expand=True)
 
         self.show_page(PAGES[0])
         self.set_album_art(self.app.album_art_image)
