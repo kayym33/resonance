@@ -448,8 +448,10 @@ class HubWindow(customtkinter.CTkToplevel):
         self.idle = idle
         if idle:
             self.app.close_context_menu()
-            self.idle_view.show_time()
+            self.idle_view.start()
             self.idle_view.show_song(self.app.song)
+        else:
+            self.idle_view.stop()
         self.configure(cursor="none" if idle else "")
         self.apply_layout()
 
@@ -520,7 +522,6 @@ class HubWindow(customtkinter.CTkToplevel):
 
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
-        self.idle_view.show_time()
         self.after(REFRESH_TIME * 1000, self.update_time)
 
     def show_song(self, song: dict[str, Any]) -> None:

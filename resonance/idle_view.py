@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import customtkinter
 
 from .ascii_art import ThemedImage
-from .backend import get_time
 from .constants import BACKGROUND, INK, INK_SOFT, MONO_FONT, MUTED
+from .windows import cancel_pending_after
 
 IDLE_ART_SIZE = 96
+# The big clock shows seconds, unlike the hub's own clock.
+CLOCK_FORMAT = "%H:%M:%S"
 
 
 def mono(size: int, weight: str = "normal") -> customtkinter.CTkFont:
@@ -40,6 +43,7 @@ class IdleView(customtkinter.CTkFrame):
         self.art_label.pack(side="left")
         text = customtkinter.CTkFrame(self.music, fg_color="transparent")
         text.pack(side="left", padx=(20, 0))
+        self.tick_id: str | None = None
         self.title_label = customtkinter.CTkLabel(
             text,
             text="",
@@ -66,7 +70,20 @@ class IdleView(customtkinter.CTkFrame):
         self.show_time()
 
     def show_time(self) -> None:
-        self.time_label.configure(text=get_time())
+        self.time_label.configure(text=time.strftime(CLOCK_FORMAT))
+
+    def start(self) -> None:
+        """Tick once a second while shown, on the second, so the seconds
+        never skip or repeat."""
+        self.stop()
+        self.show_time()
+        until_next_second = 1000 - int(time.time() * 1000) % 1000
+        self.tick_id = self.after(until_next_second + 5, self.start)
+
+    def stop(self) -> None:
+        if self.tick_id is not None:
+            self.after_cancel(self.tick_id)
+            self.tick_id = None
 
     def show_song(self, song: dict[str, Any] | None) -> None:
         if not song or not song.get("is_playing"):
@@ -84,3 +101,7 @@ class IdleView(customtkinter.CTkFrame):
             size=(IDLE_ART_SIZE, IDLE_ART_SIZE),
         )
         self.art_label.configure(image=self.art)
+
+    def destroy(self) -> None:
+        cancel_pending_after(self)
+        super().destroy()
