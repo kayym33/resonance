@@ -178,6 +178,7 @@ class WeatherPanel(customtkinter.CTkFrame):
             ).pack(fill="x", pady=(4, 0))
 
     def show_weather(self, weather: dict[str, Any]) -> None:
+        self.app.weather_updated(weather)
         self.clear_body()
         self.showing_weather = True
         self.change_button.pack(side="right")

@@ -63,6 +63,8 @@ class ResonanceApp(customtkinter.CTk):
         self.context_menu: customtkinter.CTkToplevel | None = None
         self.update_check_enabled: bool = True
         self.account_dialog: AccountDialog | None = None
+        # Latest forecast from the hub's weather panel, for the briefing.
+        self.weather: dict[str, Any] | None = None
         self.avatar_cache: tuple[object, Image.Image, Image.Image] | None = None
         self.sync: SyncEngine = SyncEngine(self)
         self.sync.listeners.append(self.account_changed)
@@ -167,10 +169,17 @@ class ResonanceApp(customtkinter.CTk):
         if self.player is not None and self.song is not None:
             self.player.show_song(self.song)
 
+    def weather_updated(self, weather: dict[str, Any]) -> None:
+        self.weather = weather
+        if self.hub is not None:
+            self.hub.today_panel.refresh()
+
     def data_changed(self, kinds: set[str]) -> None:
         """Synced data changed underneath the UI; refresh what shows it."""
         hub = self.hub
         if hub is not None:
+            if kinds & {"task", "event"}:
+                hub.today_panel.refresh()
             if "task" in kinds:
                 hub.todo_panel.reload()
             if "event" in kinds and hub.calendar_page is not None:

@@ -22,6 +22,7 @@ from .launcher_panel import LauncherPanel
 from .menu import SIZE_ROW, MenuItem
 from .noise_band import NoiseBand
 from .starfield import Starfield
+from .today_panel import TodayPanel
 from .todo_panel import TodoPanel
 from .weather_panel import WeatherPanel
 from .windows import (
@@ -34,7 +35,7 @@ from .windows import (
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
-HUB_GEOMETRY = "820x710"
+HUB_GEOMETRY = "820x770"
 # Wide enough to run off both edges of the window.
 NOISE_COLUMNS = 170
 WEATHER_COLUMN_WIDTH = 340
@@ -138,6 +139,9 @@ class HubWindow(customtkinter.CTkToplevel):
         self.home_page = customtkinter.CTkFrame(self, fg_color="transparent")
         self.calendar_page: CalendarPage | None = None
         self.page_name: str = PAGES[0]
+
+        self.today_panel: TodayPanel = TodayPanel(self.home_page, self.app)
+        self.today_panel.pack(fill="x", padx=MARGIN, pady=(0, 24))
 
         customtkinter.CTkLabel(
             self.home_page,

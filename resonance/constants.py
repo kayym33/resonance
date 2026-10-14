@@ -36,8 +36,10 @@ ACCENT = "#E8642C"
 ACCENT_DARK = "#B44718"
 ALBUM_ART_SIZE = 168
 MONO_FONT = "Consolas" if os.name == "nt" else "DejaVu Sans Mono"
-# Base zoom applied on top of every size preset.
-UI_SCALE: float = 4 / 3
+# Extra zoom on top of every size preset. Tk on Linux doesn't follow the
+# desktop's display scaling, so high-DPI screens need it; on Windows,
+# customtkinter already scales by the Windows display setting.
+UI_SCALE: float = 1.0 if os.name == "nt" else 4 / 3
 DEFAULT_SIZE = "100"
 APP_SIZES: dict[str, tuple[str, float]] = {
     name: (geometry, round(scaling * UI_SCALE, 3))
