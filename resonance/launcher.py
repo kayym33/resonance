@@ -86,6 +86,7 @@ BUILTINS: dict[str, str] = {
     "cal": "open the calendar",
     "home": "back to the home page",
     "account": "sign in or manage your account",
+    "theme": "switch between auto, night and day",
     "quit": f"quit {APP_NAME}",
 }
 

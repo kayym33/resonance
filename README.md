@@ -112,6 +112,8 @@ Start typing in the `>` prompt. Use **Up**/**Down** to pick a suggestion,
 | `todo <task>` | Add a to-do |
 | `= 12*7` | Calculate; **Enter** copies the answer |
 | `cal`, `home` | Switch hub pages |
+| `theme` | Cycle the theme: auto, night, day |
+| `account` | Sign in or manage your account |
 | `player`, `quit` | Pop out the player, or quit |
 
 Anything else becomes a web search. The commands live in `commands.json` in
@@ -141,6 +143,17 @@ Forecasts come from [Open-Meteo](https://open-meteo.com).
 Switch to the **calendar** tab. Double-click an empty slot to add an event,
 or a day in month view. Leave the start time empty for an all-day event.
 Click an event to edit or delete it.
+
+### Today and night mode
+
+The top of the home page shows today's date, weather, open to-dos and
+events, and wishes you luck.
+
+After sunset, t1ld3 switches to a night theme: bone text on dark paper,
+with the album art redrawn to match. It uses sunrise and sunset for your
+weather location, or 7am to 7pm without one. Choose **Theme** in the
+right-click menu (or type `theme`) to cycle between **auto**, **night** and
+**day**. The choice syncs with your account.
 
 ### Menu and player
 

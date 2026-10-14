@@ -2,19 +2,23 @@ from __future__ import annotations
 
 import math
 import random
+from typing import Any, Callable
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from .constants import (
-    ACCENT,
-    ACCENT_DARK,
     ALBUM_ART_SIZE,
     BACKGROUND,
+    FIGURE_COLOR,
+    FIGURE_SHADE,
     INK,
     MUTED,
 )
+from .theme import pick
 
 # Lightest to darkest; a leading space lets highlights fall away to paper.
+NIGHT_GAMMA = 1.8
+NIGHT_DENSITY_CAP = 0.7
 GLYPH_RAMP = " .`:-~=+*xo#%@"
 NOISE_MARKS = ".,`'-:;~+*"
 DEFAULT_NOISE_DENSITY = 0.42
@@ -92,6 +96,7 @@ def draw_figure(
     left: int,
     bottom: int,
     pixel: int,
+    night: bool = False,
 ) -> None:
     rows = FIGURE
     draw = ImageDraw.Draw(canvas)
@@ -100,7 +105,7 @@ def draw_figure(
     # Clear a little paper around the figure so it reads against dense noise.
     draw.rectangle(
         (left - pixel, top - pixel, left + width + pixel, bottom + pixel),
-        fill=BACKGROUND,
+        fill=pick(BACKGROUND, night),
     )
     for row_index, row in enumerate(rows):
         for column_index, cell in enumerate(row):
@@ -110,7 +115,7 @@ def draw_figure(
             y = top + row_index * pixel
             draw.rectangle(
                 (x, y, x + pixel - 1, y + pixel - 1),
-                fill=ACCENT_DARK if cell == "O" else ACCENT,
+                fill=FIGURE_SHADE if cell == "O" else FIGURE_COLOR,
             )
 
 
@@ -120,11 +125,15 @@ def render_ascii_art(
     seed: int | str | None = None,
     cell: tuple[int, int] = (5, 8),
     figure: bool = True,
+    night: bool = False,
+    photo: bool = True,
 ) -> Image.Image:
     """Redraw an image as dithered glyph noise on bone paper.
 
     ``cell`` is the pixel size of one glyph; ``figure`` adds the little
-    orange figure standing in the scene.
+    orange figure standing in the scene. At ``night`` the glyphs are
+    light on dark paper, and a ``photo`` maps brightness (not darkness)
+    to dense glyphs so it doesn't come out as a negative.
     """
     rng = random.Random(seed)
     cell_width, cell_height = cell
@@ -137,15 +146,23 @@ def render_ascii_art(
             cutoff=2,
         )
 
-    canvas = Image.new("RGB", (size, size), BACKGROUND)
+    positive = night and photo and source is not None
+    canvas = Image.new("RGB", (size, size), pick(BACKGROUND, night))
     draw = ImageDraw.Draw(canvas)
     font = load_glyph_font(cell_height + 1)
-    ink = hex_to_rgb(INK)
-    muted = hex_to_rgb(MUTED)
+    ink = hex_to_rgb(pick(INK, night))
+    muted = hex_to_rgb(pick(MUTED, night))
     last_glyph = len(GLYPH_RAMP) - 1
     for y in range(rows):
         for x in range(columns):
-            darkness = 1 - tones.getpixel((x, y)) / 255
+            darkness = tones.getpixel((x, y)) / 255
+            if positive:
+                # Light glyphs on dark paper read much heavier than ink on
+                # bone, so keep night art sparse: ease off the mid-tones and
+                # never use the very densest glyphs.
+                darkness = darkness ** NIGHT_GAMMA * NIGHT_DENSITY_CAP
+            else:
+                darkness = 1 - darkness
             darkness += rng.uniform(-0.12, 0.12)
             # Dissolve the edges into scattered marks.
             dx = (x + 0.5) / columns * 2 - 1
@@ -171,6 +188,7 @@ def render_ascii_art(
             left=round(size * 0.18),
             bottom=round(size * 0.86),
             pixel=max(2, size // 60),
+            night=night,
         )
     return canvas
 
@@ -194,6 +212,7 @@ def render_avatar(
     source: Image.Image | None,
     initial: str,
     size: int = 192,
+    night: bool = False,
 ) -> Image.Image:
     """A profile picture in the same dithered style, without the figure."""
     portrait = source if source is not None else initial_portrait(initial)
@@ -203,6 +222,8 @@ def render_avatar(
         seed=initial,
         cell=(4, 6),
         figure=False,
+        night=night,
+        photo=source is not None,
     )
 
 
@@ -247,14 +268,18 @@ def render_avatar_icon(
     initial: str,
     grid: int = 14,
     pixel: int = 4,
+    night: bool = False,
 ) -> Image.Image:
     """A tiny pixel-art version for places too small for glyphs."""
     portrait = source if source is not None else initial_portrait(initial)
+    if night and source is not None:
+        # Light up the bright parts of a photo, as in render_ascii_art.
+        portrait = ImageOps.invert(portrait.convert("L"))
     tones = ImageOps.autocontrast(
         ImageOps.fit(portrait.convert("L"), (grid, grid)),
         cutoff=2,
     )
-    icon = Image.new("RGB", (grid * pixel, grid * pixel), BACKGROUND)
+    icon = Image.new("RGB", (grid * pixel, grid * pixel), pick(BACKGROUND, night))
     draw = ImageDraw.Draw(icon)
     for y in range(grid):
         for x in range(grid):
@@ -262,6 +287,18 @@ def render_avatar_icon(
             if tones.getpixel((x, y)) < threshold:
                 draw.rectangle(
                     (x * pixel, y * pixel, (x + 1) * pixel - 1, (y + 1) * pixel - 1),
-                    fill=INK,
+                    fill=pick(INK, night),
                 )
     return icon
+
+
+ThemedImage = tuple[Image.Image, Image.Image]
+
+
+def both_themes(
+    render: Callable[..., Image.Image],
+    *args: Any,
+    **kwargs: Any,
+) -> ThemedImage:
+    """Render a (day, night) pair for CTkImage's light and dark images."""
+    return render(*args, night=False, **kwargs), render(*args, night=True, **kwargs)

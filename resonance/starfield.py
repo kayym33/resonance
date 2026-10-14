@@ -8,6 +8,7 @@ import customtkinter
 
 from .ascii_art import NOISE_MARKS, blend_rgb, hex_to_rgb
 from .constants import BACKGROUND, FAINT, MONO_FONT
+from .theme import color, unwatch, watch
 from .windows import cancel_pending_after
 
 TWINKLE_MS = 200
@@ -17,13 +18,15 @@ TWINKLE_AMOUNT = 0.02
 CELL_WIDTH, CELL_HEIGHT = 8, 13
 
 
-def faded(color: str, amount: float) -> str:
-    red, green, blue = blend_rgb(hex_to_rgb(color), hex_to_rgb(BACKGROUND), amount)
+def faded(start: str, end: str, amount: float) -> str:
+    red, green, blue = blend_rgb(hex_to_rgb(start), hex_to_rgb(end), amount)
     return f"#{red:02x}{green:02x}{blue:02x}"
 
 
-# Two depths of star: the usual faint grey, and one further back.
-STAR_COLORS = (FAINT, FAINT, faded(FAINT, 0.45))
+def star_colors() -> tuple[str, ...]:
+    """Two depths of star: the usual faint grey, and one further back."""
+    star, paper = color(FAINT), color(BACKGROUND)
+    return (star, star, faded(star, paper, 0.45))
 
 
 class Starfield(tk.Canvas):
@@ -44,7 +47,7 @@ class Starfield(tk.Canvas):
         scaling = customtkinter.ScalingTracker.get_widget_scaling(parent)
         super().__init__(
             parent,
-            bg=BACKGROUND,
+            bg=color(BACKGROUND),
             height=round(height * scaling),
             highlightthickness=0,
             bd=0,
@@ -56,8 +59,15 @@ class Starfield(tk.Canvas):
         self.columns = 0
         self.stars: dict[tuple[int, int], int] = {}
         self.font: tkfont.Font | None = None
+        self.colors: tuple[str, ...] = star_colors()
         self.bind("<Configure>", lambda _event: self.fill())
         self.after(TWINKLE_MS, self.twinkle)
+        watch(self.retheme)
+
+    def retheme(self) -> None:
+        self.configure(bg=color(BACKGROUND))
+        self.colors = star_colors()
+        self.fill()
 
     def density(self, row: int) -> float:
         position = row / max(1, self.rows - 1)
@@ -85,7 +95,7 @@ class Starfield(tk.Canvas):
             (column + 0.5) * CELL_WIDTH * scaling,
             (row + 0.5) * CELL_HEIGHT * scaling,
             text=self.rng.choice(NOISE_MARKS),
-            fill=self.rng.choice(STAR_COLORS),
+            fill=self.rng.choice(self.colors),
             font=self.font,
         )
 
@@ -99,5 +109,6 @@ class Starfield(tk.Canvas):
         self.after(TWINKLE_MS, self.twinkle)
 
     def destroy(self) -> None:
+        unwatch(self.retheme)
         cancel_pending_after(self)
         super().destroy()

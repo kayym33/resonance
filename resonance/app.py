@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+from datetime import datetime
 import sys
 import tkinter as tk
 import webbrowser
@@ -18,7 +19,13 @@ from PIL import Image
 from . import updater
 from .about import show_about
 from .account_dialog import AccountDialog
-from .ascii_art import render_ascii_art, render_avatar, render_avatar_icon
+from .ascii_art import (
+    ThemedImage,
+    both_themes,
+    render_ascii_art,
+    render_avatar,
+    render_avatar_icon,
+)
 from .backend import (
     SPOTIFY_REFRESH_TIME,
     get_current_song,
@@ -30,11 +37,23 @@ from .constants import APP_NAME, APP_SIZES, APP_VERSION, DEFAULT_SIZE
 from .hub import HubWindow
 from .instance import listen
 from .menu import MenuItem, build_context_menu
-from .settings import load_device_setting, save_device_setting
+from .settings import (
+    load_device_setting,
+    load_settings,
+    save_device_setting,
+    save_setting,
+)
+from . import theme
 from .sync import SyncEngine
 from .user_profile import avatar_source, display_name, profile_data
 from .player import PlayerWindow
 from .windows import prepare_window
+
+
+# "auto" follows sunrise and sunset; the order is the menu's cycle.
+THEME_CHOICES: tuple[str, ...] = ("auto", "night", "day")
+THEME_CHECK_MS = 60_000
+DAY_START_HOUR, DAY_END_HOUR = 7, 19
 
 
 class ResonanceApp(customtkinter.CTk):
@@ -55,7 +74,7 @@ class ResonanceApp(customtkinter.CTk):
         self.song: dict[str, Any] | None = None
         self.song_request_active: bool = False
         self.album_art_url: str | None = None
-        self.album_art_image: Image.Image = render_ascii_art(None)
+        self.album_art_image: ThemedImage = both_themes(render_ascii_art, None)
         self.hub: HubWindow | None = None
         self.player: PlayerWindow | None = None
         # Size preset from the right-click menu; its zoom is app-wide.
@@ -65,7 +84,7 @@ class ResonanceApp(customtkinter.CTk):
         self.account_dialog: AccountDialog | None = None
         # Latest forecast from the hub's weather panel, for the briefing.
         self.weather: dict[str, Any] | None = None
-        self.avatar_cache: tuple[object, Image.Image, Image.Image] | None = None
+        self.avatar_cache: tuple[object, ThemedImage, ThemedImage] | None = None
         self.sync: SyncEngine = SyncEngine(self)
         self.sync.listeners.append(self.account_changed)
         # Tk's Entry treats Ctrl+A as "go to line start"; make it select all.
@@ -73,8 +92,10 @@ class ResonanceApp(customtkinter.CTk):
         # A second launch of the app asks this copy to show the hub.
         self.instance_server = listen(lambda: self.after(0, self.open_hub))
 
+        self.update_theme()
         self.open_hub()
         self.poll_song()
+        self.after(THEME_CHECK_MS, self.theme_tick)
         if self.sync.session is None and not load_device_setting("account_prompted"):
             self.after(800, self.prompt_for_account)
 
@@ -146,7 +167,7 @@ class ResonanceApp(customtkinter.CTk):
         mark = marks.get(self.sync.status, "")
         return f"{name} {mark}".strip(), self.sync.status in ("offline", "error")
 
-    def avatar_images(self) -> tuple[Image.Image, Image.Image]:
+    def avatar_images(self) -> tuple[ThemedImage, ThemedImage]:
         """The profile picture as (large ASCII art, small pixel icon)."""
         session = self.sync.session
         initial = (display_name() or (session.email if session else "") or "~")[:1]
@@ -155,8 +176,8 @@ class ResonanceApp(customtkinter.CTk):
             source = avatar_source()
             self.avatar_cache = (
                 key,
-                render_avatar(source, initial),
-                render_avatar_icon(source, initial),
+                both_themes(render_avatar, source, initial),
+                both_themes(render_avatar_icon, source, initial),
             )
         return self.avatar_cache[1], self.avatar_cache[2]
 
@@ -173,6 +194,44 @@ class ResonanceApp(customtkinter.CTk):
         self.weather = weather
         if self.hub is not None:
             self.hub.today_panel.refresh()
+        self.update_theme()
+
+    # Day and night themes
+
+    @staticmethod
+    def theme_choice() -> str:
+        choice = load_settings().get("theme")
+        return choice if choice in THEME_CHOICES else "auto"
+
+    def cycle_theme(self) -> str:
+        """Step auto -> night -> day -> auto; returns the new choice."""
+        choices = THEME_CHOICES
+        choice = choices[(choices.index(self.theme_choice()) + 1) % len(choices)]
+        save_setting("theme", choice)
+        self.update_theme()
+        return choice
+
+    def is_dark_outside(self) -> bool:
+        """Night between sunset and sunrise where the weather is for, or
+        7pm to 7am when there's no forecast yet."""
+        now = datetime.now()
+        weather = self.weather
+        if weather and weather.get("sunrise") and weather.get("sunset"):
+            sunrise = datetime.fromisoformat(weather["sunrise"])
+            sunset = datetime.fromisoformat(weather["sunset"])
+            if sunrise.date() == now.date():
+                return not sunrise <= now < sunset
+        return not DAY_START_HOUR <= now.hour < DAY_END_HOUR
+
+    def update_theme(self) -> None:
+        choice = self.theme_choice()
+        theme.set_night(
+            choice == "night" or (choice == "auto" and self.is_dark_outside())
+        )
+
+    def theme_tick(self) -> None:
+        self.update_theme()
+        self.after(THEME_CHECK_MS, self.theme_tick)
 
     def data_changed(self, kinds: set[str]) -> None:
         """Synced data changed underneath the UI; refresh what shows it."""
@@ -180,6 +239,8 @@ class ResonanceApp(customtkinter.CTk):
         if hub is not None:
             if kinds & {"task", "event"}:
                 hub.today_panel.refresh()
+        if "setting" in kinds:
+            self.update_theme()
             if "task" in kinds:
                 hub.todo_panel.reload()
             if "event" in kinds and hub.calendar_page is not None:
@@ -355,10 +416,10 @@ class ResonanceApp(customtkinter.CTk):
     def load_album_art(self, image_url: str | None) -> None:
         self.album_art_url = image_url
         if not image_url:
-            self.show_album_art(render_ascii_art(None))
+            self.show_album_art(both_themes(render_ascii_art, None))
             return
 
-        future: Future[Image.Image] = self.worker.submit(
+        future: Future[ThemedImage] = self.worker.submit(
             self.download_album_art,
             image_url,
         )
@@ -369,36 +430,36 @@ class ResonanceApp(customtkinter.CTk):
         )
 
     @staticmethod
-    def download_album_art(image_url: str) -> Image.Image:
+    def download_album_art(image_url: str) -> ThemedImage:
         with urlopen(image_url, timeout=5) as response:
             image = Image.open(BytesIO(response.read())).convert("RGB")
-        return render_ascii_art(image, seed=image_url)
+        return both_themes(render_ascii_art, image, seed=image_url)
 
     def album_art_request_finished(
         self,
-        future: Future[Image.Image],
+        future: Future[ThemedImage],
         requested_url: str,
     ) -> None:
         self.after(0, self.apply_album_art, future, requested_url)
 
     def apply_album_art(
         self,
-        future: Future[Image.Image],
+        future: Future[ThemedImage],
         requested_url: str,
     ) -> None:
         if requested_url != self.album_art_url:
             return
 
         try:
-            image: Image.Image = future.result()
+            images = future.result()
         except Exception:
-            image = render_ascii_art(None)
-        self.show_album_art(image)
+            images = both_themes(render_ascii_art, None)
+        self.show_album_art(images)
 
-    def show_album_art(self, image: Image.Image) -> None:
-        self.album_art_image = image
+    def show_album_art(self, images: ThemedImage) -> None:
+        self.album_art_image = images
         for window in self.windows():
-            window.set_album_art(image)
+            window.set_album_art(images)
 
     def toggle_playback(self) -> None:
         self.worker.submit(toggle_playback)

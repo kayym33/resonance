@@ -122,7 +122,7 @@ def get_weather(location: Location) -> dict[str, Any]:
             "latitude": location.latitude,
             "longitude": location.longitude,
             "current": "temperature_2m,apparent_temperature,weather_code,is_day",
-            "daily": "temperature_2m_max,temperature_2m_min",
+            "daily": "temperature_2m_max,temperature_2m_min,sunrise,sunset",
             "forecast_days": 1,
             "timezone": "auto",
         }
@@ -141,4 +141,7 @@ def get_weather(location: Location) -> dict[str, Any]:
         "low": round(data["daily"]["temperature_2m_min"][0]),
         "description": description,
         "icon": ICONS[icon],
+        # Local times at the location, like "2026-10-14T07:45".
+        "sunrise": data["daily"]["sunrise"][0],
+        "sunset": data["daily"]["sunset"][0],
     }

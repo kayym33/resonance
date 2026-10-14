@@ -6,7 +6,7 @@ from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any
 
 import customtkinter
-from PIL import Image
+from .ascii_art import ThemedImage
 from .backend import (
     REFRESH_TIME,
     get_time,
@@ -30,6 +30,7 @@ from .constants import (
     MIN_LOADING_TIME
 )
 from .menu import SIZE_ROW, MenuItem
+from .theme import color
 from .noise_band import NoiseBand
 from .user_profile import display_name
 from .windows import cancel_pending_after, outline_width, prepare_window
@@ -389,6 +390,10 @@ class PlayerWindow(customtkinter.CTkToplevel):
             [
                 MenuItem("Open hub", self.app.open_hub),
                 MenuItem("Open Spotify", self.app.open_spotify),
+                MenuItem(
+                    f"Theme: {self.app.theme_choice()}",
+                    self.app.cycle_theme,
+                ),
                 MenuItem(f"{check}  Always on top", self.toggle_menu_always_on_top),
                 SIZE_ROW,
                 MenuItem("Refresh song", self.app.refresh_song),
@@ -544,11 +549,11 @@ class PlayerWindow(customtkinter.CTkToplevel):
 
         fade_steps = 24
         fade_amount = min(step + 1, fade_steps) / fade_steps
-        background = BACKGROUND
-        title_color = self.blend_color(INK, background, fade_amount)
-        status_color = self.blend_color(MUTED, background, fade_amount)
-        bar_color = self.blend_color(INK, background, fade_amount)
-        bar_background = self.blend_color(RULE, background, fade_amount)
+        background = color(BACKGROUND)
+        title_color = self.blend_color(color(INK), background, fade_amount)
+        status_color = self.blend_color(color(MUTED), background, fade_amount)
+        bar_color = self.blend_color(color(INK), background, fade_amount)
+        bar_background = self.blend_color(color(RULE), background, fade_amount)
         self.loading_title.configure(text_color=title_color)
         self.loading_status.configure(text_color=status_color)
         self.loading_progress.configure(
@@ -632,10 +637,10 @@ class PlayerWindow(customtkinter.CTkToplevel):
         minutes, seconds = divmod(total_seconds, 60)
         return f"{minutes}:{seconds:02d}"
 
-    def set_album_art(self, image: Image.Image) -> None:
+    def set_album_art(self, images: ThemedImage) -> None:
         self.album_art = customtkinter.CTkImage(
-            light_image=image,
-            dark_image=image,
+            light_image=images[0],
+            dark_image=images[1],
             size=(ALBUM_ART_SIZE, ALBUM_ART_SIZE),
         )
         self.album_art_label.configure(image=self.album_art, text="")

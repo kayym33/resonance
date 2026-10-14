@@ -27,6 +27,7 @@ from .events import (
     load_events,
     save_event,
 )
+from .theme import color, unwatch, watch
 from .windows import cancel_pending_after, outline_width
 
 VIEWS: tuple[str, ...] = ("today", "3 days", "week", "month")
@@ -97,21 +98,21 @@ class CalendarPage(customtkinter.CTkFrame):
         self.header_canvas = tk.Canvas(
             self,
             height=1,
-            bg=BACKGROUND,
+            bg=color(BACKGROUND),
             highlightthickness=0,
             bd=0,
         )
         self.header_canvas.pack(fill="x", pady=(16, 0))
-        body = tk.Frame(self, bg=BACKGROUND, bd=0, highlightthickness=0)
-        body.pack(fill="both", expand=True)
+        self.body = tk.Frame(self, bg=color(BACKGROUND), bd=0, highlightthickness=0)
+        self.body.pack(fill="both", expand=True)
         self.grid_canvas = tk.Canvas(
-            body,
-            bg=BACKGROUND,
+            self.body,
+            bg=color(BACKGROUND),
             highlightthickness=0,
             bd=0,
         )
         self.scrollbar = customtkinter.CTkScrollbar(
-            body,
+            self.body,
             command=self.grid_canvas.yview,
             fg_color=BACKGROUND,
             button_color=HOVER,
@@ -136,6 +137,12 @@ class CalendarPage(customtkinter.CTkFrame):
 
         self.set_view(self.view)
         self.after(60_000, self.tick)
+        watch(self.retheme)
+
+    def retheme(self) -> None:
+        for widget in (self.header_canvas, self.body, self.grid_canvas):
+            widget.configure(bg=color(BACKGROUND))
+        self.redraw()
 
     # Navigation
 
@@ -274,13 +281,13 @@ class CalendarPage(customtkinter.CTkFrame):
             text="all day",
             anchor="e",
             font=self.font(9),
-            fill=MUTED,
+            fill=color(MUTED),
         )
         for index, day in enumerate(days):
             x = gutter + index * column
             tags = ("goto", f"goto:{day.isoformat()}")
             label = f"{day:%a} {day.day}".lower()
-            color = INK_SOFT
+            label_color = INK_SOFT
             if day == today:
                 half_width = min(
                     column / 2 - 2 * s,
@@ -291,17 +298,17 @@ class CalendarPage(customtkinter.CTkFrame):
                     1,
                     x + column / 2 + half_width,
                     label_height - 1,
-                    fill=INK,
+                    fill=color(INK),
                     outline="",
                     tags=tags,
                 )
-                color = BACKGROUND
+                label_color = BACKGROUND
             header.create_text(
                 x + column / 2,
                 label_height / 2,
                 text=label,
                 font=self.font(10, "bold"),
-                fill=color,
+                fill=color(label_color),
                 tags=tags,
             )
             all_day = [event for event in events_on(self.events, day) if event.all_day]
@@ -327,13 +334,13 @@ class CalendarPage(customtkinter.CTkFrame):
         )
         for hour_index in range(24):
             y = hour_index * hour
-            grid.create_line(gutter, y, width, y, fill=RULE)
+            grid.create_line(gutter, y, width, y, fill=color(RULE))
             grid.create_line(
                 gutter,
                 y + hour / 2,
                 width,
                 y + hour / 2,
-                fill=RULE,
+                fill=color(RULE),
                 dash=(2, 4),
             )
             if hour_index:
@@ -343,11 +350,11 @@ class CalendarPage(customtkinter.CTkFrame):
                     text=f"{hour_index:02d}:00",
                     anchor="e",
                     font=self.font(9),
-                    fill=MUTED,
+                    fill=color(MUTED),
                 )
         for index in range(len(days) + 1):
             x = gutter + index * column
-            grid.create_line(x, 0, x, total_height, fill=RULE)
+            grid.create_line(x, 0, x, total_height, fill=color(RULE))
 
         for index, day in enumerate(days):
             x = gutter + index * column
@@ -377,7 +384,7 @@ class CalendarPage(customtkinter.CTkFrame):
                 y,
                 x + column,
                 y,
-                fill=ACCENT,
+                fill=color(ACCENT),
                 width=max(1, round(2 * s)),
             )
             dot = 3 * s
@@ -386,7 +393,7 @@ class CalendarPage(customtkinter.CTkFrame):
                 y - dot,
                 x + dot,
                 y + dot,
-                fill=ACCENT,
+                fill=color(ACCENT),
                 outline="",
             )
 
@@ -421,7 +428,7 @@ class CalendarPage(customtkinter.CTkFrame):
                 label_height / 2,
                 text=name,
                 font=self.font(10, "bold"),
-                fill=MUTED,
+                fill=color(MUTED),
             )
 
         grid.delete("all")
@@ -433,7 +440,7 @@ class CalendarPage(customtkinter.CTkFrame):
         for offset, day in enumerate(self.layout_days):
             x = offset % 7 * column
             y = offset // 7 * row_height
-            grid.create_rectangle(x, y, x + column, y + row_height, outline=RULE)
+            grid.create_rectangle(x, y, x + column, y + row_height, outline=color(RULE))
             number_color = INK_SOFT if day.month == first.month else FAINT
             tags = ("goto", f"goto:{day.isoformat()}")
             if day == today:
@@ -443,7 +450,7 @@ class CalendarPage(customtkinter.CTkFrame):
                     y + 3 * s,
                     x + 3 * s + box,
                     y + 3 * s + number_font.metrics("linespace"),
-                    fill=INK,
+                    fill=color(INK),
                     outline="",
                     tags=tags,
                 )
@@ -454,7 +461,7 @@ class CalendarPage(customtkinter.CTkFrame):
                 text=str(day.day),
                 anchor="nw",
                 font=number_font,
-                fill=number_color,
+                fill=color(number_color),
                 tags=tags,
             )
 
@@ -474,7 +481,7 @@ class CalendarPage(customtkinter.CTkFrame):
                         line_top,
                         x + column - 3 * s,
                         line_top + line_height - 2 * s,
-                        fill=HOVER,
+                        fill=color(HOVER),
                         outline="",
                         tags=event_tags,
                     )
@@ -484,7 +491,7 @@ class CalendarPage(customtkinter.CTkFrame):
                     text=truncate(event.label(), max_chars),
                     anchor="nw",
                     font=event_font,
-                    fill=INK,
+                    fill=color(INK),
                     tags=event_tags,
                 )
             hidden = len(day_events) - len(shown)
@@ -495,7 +502,7 @@ class CalendarPage(customtkinter.CTkFrame):
                     text=f"+{hidden} more",
                     anchor="nw",
                     font=event_font,
-                    fill=MUTED,
+                    fill=color(MUTED),
                     tags=tags,
                 )
 
@@ -514,8 +521,8 @@ class CalendarPage(customtkinter.CTkFrame):
             top,
             right,
             bottom,
-            fill=HOVER,
-            outline=INK,
+            fill=color(HOVER),
+            outline=color(INK),
             tags=tags,
         )
         max_chars = int((right - left - 8 * s) // self.font(10).measure("0"))
@@ -531,7 +538,7 @@ class CalendarPage(customtkinter.CTkFrame):
                 text=truncate(line, max_chars),
                 anchor="nw",
                 font=line_font,
-                fill=INK if index == 0 else INK_SOFT,
+                fill=color(INK if index == 0 else INK_SOFT),
                 tags=tags,
             )
             y += line_height
@@ -639,6 +646,7 @@ class CalendarPage(customtkinter.CTkFrame):
         self.redraw()
 
     def destroy(self) -> None:
+        unwatch(self.retheme)
         cancel_pending_after(self)
         super().destroy()
 

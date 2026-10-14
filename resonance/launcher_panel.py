@@ -262,6 +262,8 @@ class LauncherPanel(customtkinter.CTkFrame):
             self.app.hub.show_page("calendar" if suggestion.args == "cal" else "home")
         elif suggestion.args == "account" and self.app.hub is not None:
             self.app.open_account(self.app.hub)
+        elif suggestion.args == "theme":
+            self.show_status(f"theme: {self.app.cycle_theme()}")
         elif suggestion.args == "player":
             self.app.open_player()
         elif suggestion.args == "quit":

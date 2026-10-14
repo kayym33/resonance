@@ -7,6 +7,8 @@ from pathlib import Path
 
 import customtkinter
 
+from .theme import Color, color, unwatch, watch
+
 ICON_PATH: Path = Path(__file__).resolve().parents[1] / "assets" / "icon.ico"
 
 
@@ -54,13 +56,25 @@ def outline_width(widget: tk.Misc) -> int:
 
 def add_rule(
     parent: tk.Misc,
-    color: str,
+    line_color: Color,
     padx: int = 0,
     pady: tuple[int, int] = (0, 0),
 ) -> tk.Frame:
     """Pack a 1px horizontal line; CTkFrame draws nothing that thin."""
     scaling = customtkinter.ScalingTracker.get_widget_scaling(parent)
-    line = tk.Frame(parent, height=1, bg=color, bd=0, highlightthickness=0)
+    line = tk.Frame(
+        parent,
+        height=1,
+        bg=color(line_color),
+        bd=0,
+        highlightthickness=0,
+    )
+
+    def retheme() -> None:
+        line.configure(bg=color(line_color))
+
+    watch(retheme)
+    line.bind("<Destroy>", lambda _event: unwatch(retheme))
     line.pack(
         fill="x",
         padx=round(padx * scaling),

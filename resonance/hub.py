@@ -4,8 +4,8 @@ import tkinter as tk
 from typing import TYPE_CHECKING, Any
 
 import customtkinter
-from PIL import Image
 
+from .ascii_art import ThemedImage
 from .backend import REFRESH_TIME, get_time
 from .constants import (
     ACCENT_DARK,
@@ -293,8 +293,8 @@ class HubWindow(customtkinter.CTkToplevel):
             return
         _large, icon = self.app.avatar_images()
         self.avatar_icon = customtkinter.CTkImage(
-            light_image=icon,
-            dark_image=icon,
+            light_image=icon[0],
+            dark_image=icon[1],
             size=(AVATAR_ICON_SIZE, AVATAR_ICON_SIZE),
         )
         self.avatar_label.configure(image=self.avatar_icon)
@@ -309,6 +309,10 @@ class HubWindow(customtkinter.CTkToplevel):
             [
                 MenuItem("Pop out player", self.app.open_player),
                 MenuItem("Open Spotify", self.app.open_spotify),
+                MenuItem(
+                    f"Theme: {self.app.theme_choice()}",
+                    self.app.cycle_theme,
+                ),
                 MenuItem("Account", lambda: self.app.open_account(self)),
                 SIZE_ROW,
                 MenuItem("Refresh song", self.app.refresh_song),
@@ -380,10 +384,10 @@ class HubWindow(customtkinter.CTkToplevel):
         self.artist_label.configure(text="Please open Spotify and try again")
         self.meta_label.configure(text="")
 
-    def set_album_art(self, image: Image.Image) -> None:
+    def set_album_art(self, images: ThemedImage) -> None:
         self.album_art = customtkinter.CTkImage(
-            light_image=image,
-            dark_image=image,
+            light_image=images[0],
+            dark_image=images[1],
             size=(HUB_ART_SIZE, HUB_ART_SIZE),
         )
         self.album_art_label.configure(image=self.album_art)

@@ -226,8 +226,8 @@ class AccountDialog(customtkinter.CTkToplevel):
     def show_avatar(self) -> None:
         large, _icon = self.app.avatar_images()
         self.avatar_image = customtkinter.CTkImage(
-            light_image=large,
-            dark_image=large,
+            light_image=large[0],
+            dark_image=large[1],
             size=(AVATAR_SIZE, AVATAR_SIZE),
         )
         self.avatar_label.configure(image=self.avatar_image)
