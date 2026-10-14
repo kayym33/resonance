@@ -19,6 +19,8 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
+from .battery import describe as describe_battery
+from .battery import read_battery
 from .calendar_page import CalendarPage
 from .idle_view import IdleView
 from .launcher_panel import LauncherPanel
@@ -43,6 +45,7 @@ HUB_GEOMETRY = f"{HUB_SIZE[0]}x{HUB_SIZE[1]}"
 # Full screen swaps the hub for a big clock after this long untouched.
 IDLE_AFTER_S = 45
 ACTIVITY_CHECK_MS = 500
+BATTERY_CHECK_MS = 30_000
 # Star density around the hub in full screen.
 BACKDROP_DENSITY = 0.2
 # Wide enough to run off both edges of the window.
@@ -150,6 +153,12 @@ class HubWindow(customtkinter.CTkToplevel):
             text_color=INK_SOFT,
         )
         self.time_label.pack(side="right")
+        # Only packed on computers with a battery (see update_battery).
+        self.battery_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
+            header,
+            text="",
+            font=mono(12),
+        )
         self.account_button: customtkinter.CTkButton = customtkinter.CTkButton(
             header,
             text="",
@@ -302,6 +311,7 @@ class HubWindow(customtkinter.CTkToplevel):
         if self.app.song is not None:
             self.show_song(self.app.song)
         self.update_time()
+        self.update_battery()
         # The suggestion dropdown floats above the panels packed after it.
         self.launcher.dropdown.lift()
         self.after(150, self.focus_launcher)
@@ -521,6 +531,24 @@ class HubWindow(customtkinter.CTkToplevel):
         self.weather_panel.refresh_outlines()
         self.todo_panel.refresh_outlines()
         self.launcher.refresh_outlines()
+
+    def update_battery(self) -> None:
+        battery = read_battery()
+        if battery is None:
+            self.battery_label.pack_forget()
+        else:
+            self.battery_label.configure(
+                text=describe_battery(battery),
+                text_color=ACCENT_DARK if battery.low else MUTED,
+            )
+            if self.battery_label.winfo_manager() != "pack":
+                # Packed after the clock, so it sits just left of it.
+                self.battery_label.pack(
+                    side="right",
+                    padx=(0, 18),
+                    after=self.time_label,
+                )
+        self.after(BATTERY_CHECK_MS, self.update_battery)
 
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())

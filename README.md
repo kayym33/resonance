@@ -156,6 +156,13 @@ weather location, or 7am to 7pm without one. Choose **Theme** in the
 right-click menu (or type `theme`) to cycle between **auto**, **night** and
 **day**. The choice syncs with your account.
 
+### Battery
+
+On a laptop, the hub's header shows the battery next to the clock, like
+`[###··] 69%`, with `+` while it's plugged in. It turns orange at 20% or
+below when unplugged. Computers without a battery (and batteries in
+wireless mice or keyboards) don't show anything.
+
 ### Menu and player
 
 Right-click anywhere in the hub or the player for more options:
