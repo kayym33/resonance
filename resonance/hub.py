@@ -41,10 +41,10 @@ if TYPE_CHECKING:
 HUB_SIZE = (820, 770)
 HUB_GEOMETRY = f"{HUB_SIZE[0]}x{HUB_SIZE[1]}"
 # Full screen swaps the hub for a big clock after this long untouched.
-IDLE_AFTER_S = 30
+IDLE_AFTER_S = 45
 ACTIVITY_CHECK_MS = 500
 # Star density around the hub in full screen.
-BACKDROP_DENSITY = 0.12
+BACKDROP_DENSITY = 0.2
 # Wide enough to run off both edges of the window.
 NOISE_COLUMNS = 170
 WEATHER_COLUMN_WIDTH = 340

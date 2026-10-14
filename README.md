@@ -168,7 +168,7 @@ Right-click anywhere in the hub or the player for more options:
 
 Press **F11**, click the title bar's maximize button, or choose **Full
 screen** in the menu to fill the screen with stars, with the hub floating in
-the middle. **Esc** or **F11** goes back. After 30 seconds without touching
+the middle. **Esc** or **F11** goes back. After 45 seconds without touching
 the mouse or keyboard, full screen fades down to a big clock, plus the song
 if one is playing. Move the mouse or press a key to bring the hub back.
 
