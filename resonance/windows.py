@@ -87,15 +87,21 @@ def cancel_pending_after(widget: tk.Misc) -> None:
     """Cancel a widget's scheduled callbacks before it is destroyed.
 
     Polling loops reschedule themselves with ``after``; without this, Tk
-    fires them against the destroyed widget and prints errors.
+    fires them against the destroyed widget and prints errors. This only
+    tidies up, so it must never stop a window from closing.
     """
     owned = set(widget._tclCommands or ())
-    for after_id in widget.tk.splitlist(widget.tk.call("after", "info")):
+    try:
+        after_ids = widget.tk.splitlist(widget.tk.call("after", "info"))
+    except tk.TclError:
+        return
+    for after_id in after_ids:
         try:
             script = widget.tk.splitlist(
                 widget.tk.call("after", "info", after_id)
             )[0]
         except tk.TclError:
             continue
-        if script in owned:
+        # Tk can hand back a Tcl object rather than a str here.
+        if str(script) in owned:
             widget.after_cancel(after_id)
