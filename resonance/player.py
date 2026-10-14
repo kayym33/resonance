@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 import time
 import tkinter as tk
 from concurrent.futures import Future
@@ -14,7 +13,6 @@ from .backend import (
     seek_playback,
     set_volume,
 )
-from .ascii_art import drift_noise, noise_line
 from .constants import (
     ACCENT,
     ACCENT_DARK,
@@ -22,7 +20,6 @@ from .constants import (
     APP_NAME,
     APP_SIZES,
     BACKGROUND,
-    FAINT,
     HOVER,
     INK,
     INK_SOFT,
@@ -33,6 +30,7 @@ from .constants import (
     MIN_LOADING_TIME
 )
 from .menu import SIZE_ROW, MenuItem
+from .noise_band import NoiseBand
 from .user_profile import display_name
 from .windows import cancel_pending_after, outline_width, prepare_window
 
@@ -77,17 +75,8 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.loading_progress_value: float = 0.0
         self.loading_started_at: float = time.monotonic()
         self.quote_index: int = 0
-        self.noise_rng: random.Random = random.Random()
 
-        self.noise_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
-            self,
-            text=noise_line(72, self.noise_rng),
-            font=customtkinter.CTkFont(family=MONO_FONT, size=8),
-            text_color=FAINT,
-            height=12,
-            anchor="center",
-        )
-        self.noise_label.pack(fill="x", pady=(6, 0))
+        NoiseBand(self, 90, (0.5, 0.26)).pack(fill="x", pady=(6, 0))
 
         self.time_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self,
@@ -348,7 +337,6 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.animate_loading_progress()
 
         self.update_time()
-        self.update_noise()
         self.update_quote()
         self.update_progress()
         if self.app.song is not None:
@@ -360,12 +348,6 @@ class PlayerWindow(customtkinter.CTkToplevel):
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
         self.after(REFRESH_TIME * 1000, self.update_time)
-
-    def update_noise(self) -> None:
-        self.noise_label.configure(
-            text=drift_noise(self.noise_label.cget("text"), 0.05, self.noise_rng)
-        )
-        self.after(160, self.update_noise)
 
     def update_quote(self) -> None:
         self.user_label.configure(text=QUOTES[self.quote_index])

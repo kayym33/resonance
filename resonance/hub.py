@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import random
 import tkinter as tk
 from typing import TYPE_CHECKING, Any
 
 import customtkinter
 from PIL import Image
 
-from .ascii_art import drift_noise, noise_line
 from .backend import REFRESH_TIME, get_time
 from .constants import (
     ACCENT_DARK,
     APP_NAME,
     BACKGROUND,
-    FAINT,
     HOVER,
     INK,
     INK_SOFT,
@@ -23,6 +20,7 @@ from .constants import (
 from .calendar_page import CalendarPage
 from .launcher_panel import LauncherPanel
 from .menu import SIZE_ROW, MenuItem
+from .noise_band import NoiseBand
 from .todo_panel import TodoPanel
 from .weather_panel import WeatherPanel
 from .windows import (
@@ -35,7 +33,9 @@ from .windows import (
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
-HUB_GEOMETRY = "820x650"
+HUB_GEOMETRY = "820x710"
+# Wide enough to run off both edges of the window.
+NOISE_COLUMNS = 170
 WEATHER_COLUMN_WIDTH = 340
 # Side margin and the gap between sections.
 MARGIN = 36
@@ -64,17 +64,19 @@ class HubWindow(customtkinter.CTkToplevel):
         self.bind("<Control-w>", self.close_window)
         self.bind("<Button-3>", self.show_context_menu)
         prepare_window(self)
-        self.noise_rng: random.Random = random.Random()
         self.album_art: customtkinter.CTkImage | None = None
 
-        self.noise_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
-            self,
-            text=noise_line(120, self.noise_rng),
-            font=mono(8),
-            text_color=FAINT,
-            height=12,
+        # Starfields that thin out towards the content. The bottom one is
+        # packed now so it keeps its place below the pages.
+        NoiseBand(self, NOISE_COLUMNS, (0.55, 0.32, 0.16)).pack(
+            fill="x",
+            pady=(8, 0),
         )
-        self.noise_label.pack(fill="x", pady=(8, 0))
+        NoiseBand(self, NOISE_COLUMNS, (0.08, 0.2, 0.4)).pack(
+            side="bottom",
+            fill="x",
+            pady=(0, 8),
+        )
 
         header = customtkinter.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=MARGIN, pady=(8, 0))
@@ -246,7 +248,6 @@ class HubWindow(customtkinter.CTkToplevel):
         if self.app.song is not None:
             self.show_song(self.app.song)
         self.update_time()
-        self.update_noise()
         # The suggestion dropdown floats above the panels packed after it.
         self.launcher.dropdown.lift()
         self.after(150, self.focus_launcher)
@@ -353,12 +354,6 @@ class HubWindow(customtkinter.CTkToplevel):
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
         self.after(REFRESH_TIME * 1000, self.update_time)
-
-    def update_noise(self) -> None:
-        self.noise_label.configure(
-            text=drift_noise(self.noise_label.cget("text"), 0.05, self.noise_rng)
-        )
-        self.after(160, self.update_noise)
 
     def show_song(self, song: dict[str, Any]) -> None:
         self.song_label.configure(text=str(song["title"]))

@@ -16,7 +16,8 @@ from .constants import (
 
 # Lightest to darkest; a leading space lets highlights fall away to paper.
 GLYPH_RAMP = " .`:-~=+*xo#%@"
-NOISE_GLYPHS = " " * 14 + ".,`'-:;~+*"
+NOISE_MARKS = ".,`'-:;~+*"
+DEFAULT_NOISE_DENSITY = 0.42
 FONT_FILES = (
     "DejaVuSansMono.ttf",
     "consola.ttf",
@@ -205,16 +206,30 @@ def render_avatar(
     )
 
 
-def noise_line(length: int, rng: random.Random | None = None) -> str:
+def noise_char(rng: random.Random, density: float) -> str:
+    return rng.choice(NOISE_MARKS) if rng.random() < density else " "
+
+
+def noise_line(
+    length: int,
+    rng: random.Random | None = None,
+    density: float = DEFAULT_NOISE_DENSITY,
+) -> str:
+    """``density`` is the share of positions holding a mark."""
     rng = rng or random.Random()
-    return "".join(rng.choice(NOISE_GLYPHS) for _ in range(length))
+    return "".join(noise_char(rng, density) for _ in range(length))
 
 
-def drift_noise(line: str, amount: float, rng: random.Random) -> str:
+def drift_noise(
+    line: str,
+    amount: float,
+    rng: random.Random,
+    density: float = DEFAULT_NOISE_DENSITY,
+) -> str:
     """Flicker a fraction of the characters, like a weak terminal signal."""
     characters = list(line)
     for _ in range(max(1, round(len(characters) * amount))):
-        characters[rng.randrange(len(characters))] = rng.choice(NOISE_GLYPHS)
+        characters[rng.randrange(len(characters))] = noise_char(rng, density)
     return "".join(characters)
 
 
