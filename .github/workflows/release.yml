@@ -1,4 +1,4 @@
-name: Build Windows release
+name: Build desktop release
 
 on:
   pull_request:
@@ -17,6 +17,8 @@ jobs:
   release:
     if: github.event.pull_request.merged == true
     runs-on: windows-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Check out main
         uses: actions/checkout@v4
@@ -30,6 +32,7 @@ jobs:
           python-version: "3.12"
 
       - name: Calculate and commit patch version
+        id: version
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,6 +88,7 @@ jobs:
 
           "NEXT_VERSION=$nextVersion" >> $env:GITHUB_ENV
           "NEXT_TAG=$nextTag" >> $env:GITHUB_ENV
+          "tag=$nextTag" >> $env:GITHUB_OUTPUT
 
       - name: Install dependencies
         run: python -m pip install spotipy customtkinter pillow pyinstaller
@@ -114,3 +118,36 @@ jobs:
             dist/t1ld3.exe
             dist/Resonance.exe
           generate_release_notes: true
+
+  linux-release:
+    # Builds from the tag the Windows job just created, and adds the Linux
+    # executable to the same release.
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install spotipy customtkinter pillow pyinstaller
+
+      - name: Build Linux executable
+        run: |
+          pyinstaller --clean --onefile --windowed --name t1ld3-linux \
+            --add-data "assets/terminal_theme.json:assets" \
+            --add-data "assets/icon.ico:assets" \
+            --add-data "assets/quotes.json:assets" \
+            main.py
+
+      - name: Add Linux executable to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          files: dist/t1ld3-linux
