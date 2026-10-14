@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import customtkinter
 from .ascii_art import ThemedImage
 from .backend import (
+    PROGRESS_FRAME_MS,
     REFRESH_TIME,
     get_time,
     seek_playback,
@@ -187,7 +188,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
             self.progress_frame,
             from_=0,
             to=1,
-            number_of_steps=1000,
+            number_of_steps=10_000,
             height=10,
             corner_radius=0,
             border_width=0,
@@ -608,11 +609,14 @@ class PlayerWindow(customtkinter.CTkToplevel):
             progress_ms / self.duration_ms if self.duration_ms else 0
         )
         self.progress_bar.set(progress)
-        self.progress_label.configure(
-            text=f"{self.format_time(progress_ms)} / "
+        label = (
+            f"{self.format_time(progress_ms)} / "
             f"{self.format_time(self.duration_ms)}"
         )
-        self.after(100, self.update_progress)
+        # The bar moves every frame; the label only changes once a second.
+        if label != self.progress_label.cget("text"):
+            self.progress_label.configure(text=label)
+        self.after(PROGRESS_FRAME_MS, self.update_progress)
 
     def change_playback_position(self, value: float) -> None:
         if not self.duration_ms:

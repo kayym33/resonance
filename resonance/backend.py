@@ -13,6 +13,8 @@ from .paths import DATA_DIR
 
 REFRESH_TIME: int = 1
 SPOTIFY_REFRESH_TIME: int = 5
+# Redraw the player's progress bar at about 60 frames a second.
+PROGRESS_FRAME_MS: int = 16
 SPOTIFY_TOKEN_PATH = DATA_DIR / "spotify-token.json"
 
 
