@@ -54,10 +54,10 @@ class LauncherPanel(customtkinter.CTkFrame):
 
     def __init__(
         self,
-        hub: customtkinter.CTkToplevel,
+        parent: customtkinter.CTkFrame,
         app: ResonanceApp,
     ) -> None:
-        super().__init__(hub, fg_color="transparent")
+        super().__init__(parent, fg_color="transparent")
         self.app: ResonanceApp = app
         self.commands: list[Command] = []
         self.suggestions: list[Suggestion] = []
@@ -99,9 +99,9 @@ class LauncherPanel(customtkinter.CTkFrame):
         )
         self.status_label.pack(fill="x", pady=(6, 0))
 
-        # Lives on the hub so it can float over the panels below.
+        # Lives on the hub window so it can float over the panels below.
         self.dropdown: customtkinter.CTkFrame = customtkinter.CTkFrame(
-            hub,
+            self.winfo_toplevel(),
             fg_color=BACKGROUND,
             border_color=INK,
             border_width=outline_width(self),
@@ -217,10 +217,13 @@ class LauncherPanel(customtkinter.CTkFrame):
             self.update_suggestions()
         return "break"
 
-    def clear(self) -> str:
+    def clear(self) -> str | None:
+        had_text = bool(self.entry.get())
         self.entry.delete(0, "end")
         self.update_suggestions()
-        return "break"
+        # With nothing to clear, let Escape reach the hub (to leave full
+        # screen).
+        return "break" if had_text else None
 
     # Running
 
@@ -264,6 +267,8 @@ class LauncherPanel(customtkinter.CTkFrame):
             self.app.open_account(self.app.hub)
         elif suggestion.args == "theme":
             self.show_status(f"theme: {self.app.cycle_theme()}")
+        elif suggestion.args == "fullscreen" and self.app.hub is not None:
+            self.app.hub.toggle_fullscreen()
         elif suggestion.args == "player":
             self.app.open_player()
         elif suggestion.args == "quit":

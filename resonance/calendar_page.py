@@ -55,9 +55,10 @@ class CalendarPage(customtkinter.CTkFrame):
     CTk, so every size is multiplied by the widget scaling by hand.
     """
 
-    def __init__(self, hub: customtkinter.CTkToplevel) -> None:
-        super().__init__(hub, fg_color="transparent")
-        self.hub = hub
+    def __init__(self, parent: customtkinter.CTkFrame) -> None:
+        super().__init__(parent, fg_color="transparent")
+        # Event dialogs belong to the hub window.
+        self.hub = parent.winfo_toplevel()
         self.events: list[Event] = load_events()
         self.view: str = "week"
         self.anchor: date = date.today()

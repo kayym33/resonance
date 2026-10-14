@@ -113,6 +113,7 @@ Start typing in the `>` prompt. Use **Up**/**Down** to pick a suggestion,
 | `= 12*7` | Calculate; **Enter** copies the answer |
 | `cal`, `home` | Switch hub pages |
 | `theme` | Cycle the theme: auto, night, day |
+| `fullscreen` | Toggle full screen (or press **F11**) |
 | `account` | Sign in or manage your account |
 | `player`, `quit` | Pop out the player, or quit |
 
@@ -164,6 +165,9 @@ Right-click anywhere in the hub or the player for more options:
 - change the size
 - check for updates, and About
 - close the window, or quit
+
+Press **F11** (or choose **Full screen** in the menu) to fill the screen
+with stars, with the hub floating in the middle. **Esc** or **F11** goes back.
 
 Closing the hub leaves the player running. t1ld3 quits once both windows are
 closed. **Ctrl+Q** quits from either window.

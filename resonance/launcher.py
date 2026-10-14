@@ -87,6 +87,7 @@ BUILTINS: dict[str, str] = {
     "home": "back to the home page",
     "account": "sign in or manage your account",
     "theme": "switch between auto, night and day",
+    "fullscreen": "toggle full screen (F11)",
     "quit": f"quit {APP_NAME}",
 }
 

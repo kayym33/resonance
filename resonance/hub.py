@@ -35,7 +35,11 @@ from .windows import (
 if TYPE_CHECKING:
     from .app import ResonanceApp
 
-HUB_GEOMETRY = "820x770"
+HUB_SIZE = (820, 770)
+HUB_GEOMETRY = f"{HUB_SIZE[0]}x{HUB_SIZE[1]}"
+# Star density around the hub in full screen.
+WM_SETTLE_MS = 50
+BACKDROP_DENSITY = 0.12
 # Wide enough to run off both edges of the window.
 NOISE_COLUMNS = 170
 WEATHER_COLUMN_WIDTH = 340
@@ -65,19 +69,38 @@ class HubWindow(customtkinter.CTkToplevel):
         self.bind("<Control-q>", self.app.quit_app)
         self.bind("<Control-w>", self.close_window)
         self.bind("<Button-3>", self.show_context_menu)
+        self.bind("<F11>", lambda _event: self.toggle_fullscreen())
+        self.bind("<Escape>", self.exit_fullscreen)
         prepare_window(self)
         self.album_art: customtkinter.CTkImage | None = None
+        self.fullscreen: bool = False
+
+        # Full screen centres the hub in a field of stars. The backdrop is
+        # created first so the content stacks above it.
+        self.backdrop = Starfield(self, BACKDROP_DENSITY, BACKDROP_DENSITY)
+        self.content = customtkinter.CTkFrame(
+            self,
+            width=HUB_SIZE[0],
+            height=HUB_SIZE[1],
+            corner_radius=0,
+            fg_color="transparent",
+        )
+        self.content.pack_propagate(False)
+        self.content.pack(fill="both", expand=True)
 
         # Stars that thin out towards the content. The bottom field is
         # packed now so it keeps its place below the pages; the home page
         # fills its own spare space with more, growing denser downwards.
-        NoiseBand(self, NOISE_COLUMNS, (0.55, 0.32, 0.16)).pack(
+        NoiseBand(self.content, NOISE_COLUMNS, (0.55, 0.32, 0.16)).pack(
             fill="x",
             pady=(8, 0),
         )
-        Starfield(self, 0.22, 0.45, height=56).pack(side="bottom", fill="x")
+        Starfield(self.content, 0.22, 0.45, height=56).pack(
+            side="bottom",
+            fill="x",
+        )
 
-        header = customtkinter.CTkFrame(self, fg_color="transparent")
+        header = customtkinter.CTkFrame(self.content, fg_color="transparent")
         header.pack(fill="x", padx=MARGIN, pady=(8, 0))
         customtkinter.CTkLabel(
             header,
@@ -130,13 +153,16 @@ class HubWindow(customtkinter.CTkToplevel):
         self.avatar_label.bind("<Button-1>", lambda _event: self.app.open_account(self))
         self.show_account()
 
-        add_rule(self, INK, padx=MARGIN, pady=(10, 14))
+        add_rule(self.content, INK, padx=MARGIN, pady=(10, 14))
 
-        self.launcher: LauncherPanel = LauncherPanel(self, self.app)
+        self.launcher: LauncherPanel = LauncherPanel(self.content, self.app)
         self.launcher.pack(fill="x", padx=MARGIN, pady=(0, 8))
 
         # Pages swap in below the launcher, which stays on every page.
-        self.home_page = customtkinter.CTkFrame(self, fg_color="transparent")
+        self.home_page = customtkinter.CTkFrame(
+            self.content,
+            fg_color="transparent",
+        )
         self.calendar_page: CalendarPage | None = None
         self.page_name: str = PAGES[0]
 
@@ -263,7 +289,7 @@ class HubWindow(customtkinter.CTkToplevel):
     def show_page(self, name: str) -> None:
         if name == "calendar" and self.calendar_page is None:
             # Built on first visit to keep the hub quick to open.
-            self.calendar_page = CalendarPage(self)
+            self.calendar_page = CalendarPage(self.content)
         pages = {"home": self.home_page, "calendar": self.calendar_page}
         for page_name, page in pages.items():
             if page is not None and page_name != name:
@@ -302,6 +328,43 @@ class HubWindow(customtkinter.CTkToplevel):
             # Packed after the name button, so it sits just left of it.
             self.avatar_label.pack(side="right", padx=(0, 2))
 
+    def toggle_fullscreen(self) -> None:
+        self.set_fullscreen(not self.fullscreen)
+
+    def exit_fullscreen(self, _event: tk.Event[tk.Misc] | None = None) -> str | None:
+        if not self.fullscreen:
+            return None
+        self.set_fullscreen(False)
+        return "break"
+
+    def set_fullscreen(self, fullscreen: bool) -> None:
+        if fullscreen == self.fullscreen:
+            return
+        self.fullscreen = fullscreen
+        if fullscreen:
+            # Window managers won't fill the screen with a fixed-size window,
+            # and the "resizable" change has to reach them before the
+            # full-screen request does, hence update_idletasks and a pause.
+            self.resizable(True, True)
+            self.update_idletasks()
+            self.after(WM_SETTLE_MS, lambda: self.attributes("-fullscreen", True))
+            self.content.pack_forget()
+            self.backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
+            self.content.place(relx=0.5, rely=0.5, anchor="center")
+        else:
+            self.backdrop.place_forget()
+            self.content.place_forget()
+            self.content.pack(fill="both", expand=True)
+            self.attributes("-fullscreen", False)
+            self.update_idletasks()
+            self.after(WM_SETTLE_MS, self.restore_window_size)
+        self.launcher.dropdown.lift()
+
+    def restore_window_size(self) -> None:
+        if not self.fullscreen:
+            self.geometry(HUB_GEOMETRY)
+            self.resizable(False, False)
+
     def show_context_menu(self, event: tk.Event[tk.Misc]) -> None:
         self.app.show_context_menu(
             self,
@@ -322,6 +385,10 @@ class HubWindow(customtkinter.CTkToplevel):
                     enabled=self.app.update_check_enabled,
                 ),
                 MenuItem(f"About {APP_NAME}", lambda: self.app.show_about(self)),
+                MenuItem(
+                    "Exit full screen" if self.fullscreen else "Full screen",
+                    self.toggle_fullscreen,
+                ),
                 MenuItem("Close hub", self.close_window),
                 MenuItem(f"Quit {APP_NAME}", self.app.quit_app, ACCENT_DARK),
             ],
