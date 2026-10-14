@@ -235,12 +235,12 @@ class ResonanceApp(customtkinter.CTk):
 
     def data_changed(self, kinds: set[str]) -> None:
         """Synced data changed underneath the UI; refresh what shows it."""
+        if "setting" in kinds:
+            self.update_theme()
         hub = self.hub
         if hub is not None:
             if kinds & {"task", "event"}:
                 hub.today_panel.refresh()
-        if "setting" in kinds:
-            self.update_theme()
             if "task" in kinds:
                 hub.todo_panel.reload()
             if "event" in kinds and hub.calendar_page is not None:
