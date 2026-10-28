@@ -1,0 +1,338 @@
+/* t1ld3's look on the phone: bone and ink, monospace, square corners,
+   orange as the only accent. Colours are the desktop's (constants.py). */
+:root {
+  --background: #E7E7DD;
+  --ink: #111210;
+  --ink-soft: #3B3C37;
+  --muted: #6B6C63;
+  --faint: #A6A79B;
+  --rule: #CBCBBF;
+  --hover: #D8D8CD;
+  --field: #F0F0E8;
+  --accent: #E8642C;
+  --accent-text: #B44718;
+  --mono: ui-monospace, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="day"]) {
+    --background: #121311;
+    --ink: #E7E7DD;
+    --ink-soft: #C6C6BA;
+    --muted: #8F9086;
+    --faint: #4D4E47;
+    --rule: #33342F;
+    --hover: #262722;
+    --field: #1B1C19;
+    --accent-text: #F08A5D;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="night"] {
+  --background: #121311;
+  --ink: #E7E7DD;
+  --ink-soft: #C6C6BA;
+  --muted: #8F9086;
+  --faint: #4D4E47;
+  --rule: #33342F;
+  --hover: #262722;
+  --field: #1B1C19;
+  --accent-text: #F08A5D;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  /* No double-tap zoom, and no rubber-band bounce past the ends: an app's
+     pages stay put (pull-to-sync is the app's own, in gestures.js). */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--ink-soft);
+  font: 15px/1.5 var(--mono);
+  /* Room for the tab bar and the home indicator. */
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  /* Buttons and labels aren't text to select, and long-pressing a link
+     shouldn't pop up a preview. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: padding-bottom 200ms;
+}
+
+/* What you'd want to copy stays selectable. */
+input, textarea, .steps, .ingredients, .notes, .step {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+a { color: inherit; }
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--background);
+  padding-top: env(safe-area-inset-top);
+}
+
+.noise {
+  margin: 0;
+  height: 2.2em;
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 10px;
+  line-height: 1.1;
+  white-space: pre;
+  user-select: none;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 16px;
+  padding: 6px 0 10px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.trail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 17px;
+  color: var(--ink-soft);
+}
+
+.trail a { text-decoration: none; color: var(--muted); }
+.trail .home { color: var(--ink); font-weight: 700; }
+.trail .slash { color: var(--muted); margin: 0 0.4em; }
+
+.status { color: var(--accent-text); font-weight: 700; min-width: 1ch; }
+
+main { padding: 16px 16px 24px; }
+
+h1 { color: var(--ink); font-size: 22px; line-height: 1.25; margin: 0; }
+h2 {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 26px 0 8px;
+}
+h3 { color: var(--ink); font-size: 14px; margin: 16px 0 6px; }
+h3.now::after { content: "  ●"; color: var(--accent); }
+p { margin: 8px 0; }
+
+.muted { color: var(--muted); }
+.faint { color: var(--faint); }
+.faded { color: var(--muted); }
+.hint { color: var(--muted); font-size: 12px; font-style: italic; }
+.label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.center { text-align: center; }
+.error { color: var(--accent-text); }
+.flash { border-left: 3px solid var(--accent); padding-left: 10px; color: var(--ink); }
+.art { color: var(--muted); margin: 16px 0; font: inherit; }
+.art.center { display: table; margin: 40px auto 8px; }
+code { font: inherit; color: var(--ink); }
+
+.today { color: var(--ink); font-size: 17px; margin-top: 4px; }
+.briefing { color: var(--ink-soft); }
+
+/* Buttons: outlined, or solid ink for the main action. */
+.button, .chip {
+  appearance: none;
+  font: inherit;
+  border-radius: 0;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  padding: 9px 16px;
+  min-height: 42px;
+}
+.button.solid { background: var(--ink); color: var(--background); }
+.button.small { border: 0; color: var(--muted); font-weight: 400; min-height: 0; padding: 4px 0; }
+.button.wide { width: 100%; margin-top: 8px; }
+.button:active, .chip:active { background: var(--hover); }
+.button.solid:active { background: var(--ink-soft); }
+.button:disabled { opacity: 0.6; }
+
+.row-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+.row-buttons.bottom { margin-top: 28px; }
+.spacer { flex: 1; }
+
+.section-head { display: flex; align-items: baseline; gap: 12px; }
+.section-head h2 { margin-right: 0; }
+.section-head .button.small { margin-left: auto; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border-color: var(--rule); color: var(--ink-soft); font-weight: 400; min-height: 36px; padding: 5px 12px; }
+.chip.on { background: var(--ink); border-color: var(--ink); color: var(--background); }
+
+.picker { display: flex; align-items: center; gap: 4px; }
+.picker .muted { margin-right: 6px; }
+.picker .chip { min-width: 40px; border-color: var(--ink); }
+
+/* Fields: 16px text, or iOS zooms in on focus. */
+input, select, textarea {
+  font: 16px/1.4 var(--mono);
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  padding: 10px;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input::placeholder, textarea::placeholder { color: var(--muted); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+input[type="date"], input[type="time"] { min-height: 44px; }
+
+.search { margin: 4px 0 4px; }
+.add { margin: 8px 0 4px; }
+
+.editor label { display: block; margin: 14px 0 0; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.editor label .hint { display: block; text-transform: none; font-weight: 400; margin: 2px 0 4px; }
+.editor label input, .editor label select, .editor label textarea { margin-top: 4px; text-transform: none; font-weight: 400; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Lists: one tappable row each. */
+ul, ol { list-style: none; margin: 0; padding: 0; }
+
+.tasks li { position: relative; overflow: hidden; border-bottom: 1px solid var(--rule); }
+.tasks .slide { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; min-height: 46px; background: var(--background); }
+
+/* Swiping a row shows what letting go will do: tick on the left, delete
+   on the right. It firms up once the swipe is far enough. */
+.tasks li::before, .tasks li::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: none;
+  align-items: center;
+  padding: 0 16px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+.tasks li::before { content: attr(data-right-label); left: 0; right: 0; background: var(--ink); color: var(--background); }
+.tasks li::after { content: attr(data-left-label); left: 0; right: 0; justify-content: flex-end; background: var(--accent); color: #fff; }
+.tasks li[data-showing="right"]::before, .tasks li[data-showing="left"]::after { display: flex; }
+.tasks li[data-armed="yes"]::before, .tasks li[data-armed="yes"]::after { opacity: 1; }
+.tasks li.folding { transition: height 220ms ease; border-bottom-color: transparent; }
+.tasks .check, .tasks .delete {
+  appearance: none; border: 0; background: none; font: inherit; color: var(--ink);
+  font-weight: 700; padding: 10px 2px; min-width: 40px;
+}
+.tasks .delete { color: var(--muted); font-weight: 400; margin-left: auto; }
+.tasks .task-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tasks .done .check { color: var(--muted); font-weight: 400; }
+.tasks .done .task-text { color: var(--muted); text-decoration: line-through; }
+
+.events li, .recipes li {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  padding: 11px 0; border-bottom: 1px solid var(--rule);
+}
+.events li:active, .recipes li:active { background: var(--hover); }
+.events .span { color: var(--ink); font-weight: 700; min-width: 7.5em; }
+.events .faint { margin-left: auto; font-size: 12px; }
+.recipes strong { color: var(--ink); }
+.recipes .muted { font-size: 12px; }
+.more { color: var(--muted); }
+
+.recipe-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.star { appearance: none; border: 0; background: none; font: inherit; font-size: 22px; color: var(--muted); padding: 0 4px; }
+.star.on { color: var(--accent); }
+.ingredients li { padding: 3px 0 3px 1.4em; text-indent: -1.4em; }
+.ingredients li::before { content: "·  "; color: var(--muted); }
+.steps { counter-reset: step; }
+.steps li { counter-increment: step; padding: 6px 0 6px 2.2em; text-indent: -2.2em; }
+.steps li::before { content: counter(step) "  "; color: var(--muted); font-weight: 700; display: inline-block; width: 2.2em; text-indent: 0; }
+.notes { white-space: pre-wrap; }
+
+/* Cooking mode: one big step at a time. */
+main.cooking { display: flex; flex-direction: column; min-height: calc(100vh - 160px); }
+.cooking .step { color: var(--ink); font-size: 23px; font-weight: 700; line-height: 1.35; margin: 26px 0 8px; }
+.cooking .dots { letter-spacing: 0.15em; margin-left: 10px; color: var(--ink); }
+.cooking .timer-row { margin: 18px 0 0; }
+.cooking .next { margin-top: auto; padding-top: 24px; }
+
+/* Running timers, above every view. */
+.timers { position: sticky; top: calc(env(safe-area-inset-top) + 74px); z-index: 1; background: var(--background); margin: 0 16px; }
+.timer { display: flex; gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.timer strong { color: var(--ink); font-size: 17px; min-width: 4.5em; }
+.timer span:not(.x) { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.timer.done strong { color: var(--accent-text); }
+.timer .x { margin-left: auto; color: var(--muted); padding: 0 6px; }
+
+nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  background: var(--background);
+  border-top: 1px solid var(--ink);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+nav[hidden] { display: none; }
+nav a {
+  flex: 1;
+  text-align: center;
+  text-decoration: none;
+  color: var(--muted);
+  padding: 14px 0 12px;
+  font-size: 14px;
+}
+nav a.on { color: var(--background); background: var(--ink); font-weight: 700; }
+
+/* Pull to sync: grows above the page as you pull. */
+.pull {
+  height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* No padding: at height 0 it must take no room at all. */
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Pages arrive like iOS ones: deeper pages slide in from the right, and
+   going back slides in from the left. */
+main[data-enter="push"] { animation: enter-push 300ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+main[data-enter="pop"] { animation: enter-pop 300ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes enter-push { from { transform: translateX(40%); opacity: 0; } }
+@keyframes enter-pop { from { transform: translateX(-25%); opacity: 0; } }
+
+/* Swiping back from the edge drags the page, with a shadow at its edge. */
+main.dragging { box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18); background: var(--background); min-height: 100vh; }
+
+/* While typing, the tab bar slides away so the keyboard has the room. */
+nav { transition: transform 200ms; }
+body.typing nav { transform: translateY(110%); }
+body.typing { padding-bottom: 16px; }
+
+/* Tabs don't light up when pressed: the one you tap just becomes the
+   selected one, as in iOS. (A press colour showed as a flash, from grey
+   to dark grey to black, as the tab became selected under the finger.) */
+
+@media (prefers-reduced-motion: reduce) {
+  main[data-enter] { animation: none; }
+  nav, body, .tasks li.folding { transition: none; }
+}

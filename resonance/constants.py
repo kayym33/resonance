@@ -44,6 +44,9 @@ FIGURE_COLOR = "#E8642C"
 FIGURE_SHADE = "#B44718"
 ALBUM_ART_SIZE = 168
 MONO_FONT = "Consolas" if os.name == "nt" else "DejaVu Sans Mono"
+# Hub pages: the side margin and the gap between sections.
+MARGIN = 36
+SECTION_GAP = 32
 # Extra zoom on top of every size preset. Tk on Linux doesn't follow the
 # desktop's display scaling, so high-DPI screens need it; on Windows,
 # customtkinter already scales by the Windows display setting.

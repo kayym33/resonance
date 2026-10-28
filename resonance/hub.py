@@ -9,6 +9,7 @@ import customtkinter
 
 from .ascii_art import ThemedImage
 from .backend import REFRESH_TIME, get_time
+from .apps import HubApp, discover
 from .constants import (
     ACCENT_DARK,
     APP_NAME,
@@ -16,24 +17,21 @@ from .constants import (
     HOVER,
     INK,
     INK_SOFT,
+    MARGIN,
     MONO_FONT,
     MUTED,
 )
 from .battery import describe as describe_battery
 from .battery import read_battery
-from .calendar_page import CalendarPage
+from .home_page import HomePage
 from .idle_view import IdleView
 from .launcher_panel import LauncherPanel
 from .menu import SIZE_ROW, MenuItem
 from .noise_band import NoiseBand
 from .starfield import Starfield
-from .today_panel import TodayPanel
-from .todo_panel import TodoPanel
-from .weather_panel import WeatherPanel
 from .windows import (
     add_rule,
     cancel_pending_after,
-    outline_width,
     prepare_window,
 )
 
@@ -50,13 +48,24 @@ BATTERY_CHECK_MS = 30_000
 BACKDROP_DENSITY = 0.2
 # Wide enough to run off both edges of the window.
 NOISE_COLUMNS = 170
-WEATHER_COLUMN_WIDTH = 340
-# Side margin and the gap between sections.
-MARGIN = 36
-SECTION_GAP = 32
-PAGES: tuple[str, ...] = ("home", "calendar")
-HUB_ART_SIZE = 144
 AVATAR_ICON_SIZE = 28
+HOME = "home"
+# Room for the trail between the name and the header's right-hand side,
+# counting " / " between crumbs. Measured to clear the account name.
+TRAIL_CHARS = 44
+CRUMB_CHARS = 24
+# The trail reuses this many buttons rather than making new ones on
+# every navigation, since each new widget costs tens of milliseconds.
+MAX_CRUMBS = 6
+APP_MENU_WIDTH = 440
+
+
+def shorten(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def trail_length(crumbs: list[str]) -> int:
+    return sum(len(crumb) + 3 for crumb in crumbs)
 
 
 def mono(size: int, weight: str = "normal") -> customtkinter.CTkFont:
@@ -89,7 +98,6 @@ class HubWindow(customtkinter.CTkToplevel):
         for sequence in ("<KeyRelease>", "<ButtonRelease>", "<MouseWheel>"):
             self.bind(sequence, self.note_activity)
         prepare_window(self)
-        self.album_art: customtkinter.CTkImage | None = None
         self.fullscreen: bool = False
 
         # Full screen centres the hub in a field of stars. The backdrop is
@@ -114,9 +122,9 @@ class HubWindow(customtkinter.CTkToplevel):
         # Stars that thin out towards the content. The bottom field is
         # packed now so it keeps its place below the pages; the home page
         # fills its own spare space with more, growing denser downwards.
-        NoiseBand(self.content, NOISE_COLUMNS, (0.55, 0.32, 0.16)).pack(
+        NoiseBand(self.content, NOISE_COLUMNS, (0.5, 0.22)).pack(
             fill="x",
-            pady=(8, 0),
+            pady=(4, 0),
         )
         Starfield(self.content, 0.22, 0.45, height=56).pack(
             side="bottom",
@@ -124,28 +132,58 @@ class HubWindow(customtkinter.CTkToplevel):
         )
 
         header = customtkinter.CTkFrame(self.content, fg_color="transparent")
-        header.pack(fill="x", padx=MARGIN, pady=(8, 0))
-        customtkinter.CTkLabel(
+        header.pack(fill="x", padx=MARGIN, pady=(4, 0))
+        self.menu_button: customtkinter.CTkButton = customtkinter.CTkButton(
+            header,
+            text="≡",
+            width=24,
+            height=24,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color=HOVER,
+            text_color=INK,
+            font=mono(16, "bold"),
+            command=self.open_app_menu,
+        )
+        self.menu_button.pack(side="left", padx=(0, 10))
+        title = customtkinter.CTkButton(
             header,
             text=APP_NAME,
-            font=mono(15, "bold"),
+            width=0,
+            height=24,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color=HOVER,
             text_color=INK,
-        ).pack(side="left")
-        self.page_tabs: dict[str, customtkinter.CTkButton] = {}
-        for page_name in PAGES:
-            tab = customtkinter.CTkButton(
-                header,
-                text=page_name,
-                width=len(page_name) * 9 + 24,
+            font=mono(15, "bold"),
+            command=lambda: self.show_page(HOME),
+        )
+        title.pack(side="left")
+        # "/ cookbook / recipes" next to the name while an app is open.
+        # An empty CTkFrame asks for 200x200 by default, which on the home
+        # page (no crumbs) made the whole header row that tall.
+        self.trail_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
+            header,
+            width=1,
+            height=1,
+            fg_color="transparent",
+        )
+        self.trail_frame.pack(side="left", padx=(2, 0))
+        self.trails: dict[str, list[str]] = {}
+        self.crumbs: list[customtkinter.CTkButton] = [
+            customtkinter.CTkButton(
+                self.trail_frame,
+                text="",
+                width=0,
                 height=24,
                 corner_radius=0,
                 fg_color="transparent",
                 hover_color=HOVER,
-                font=mono(12, "bold"),
-                command=lambda chosen=page_name: self.show_page(chosen),
+                text_color=MUTED,
+                font=mono(15),
             )
-            tab.pack(side="left", padx=(16 if page_name == PAGES[0] else 2, 0))
-            self.page_tabs[page_name] = tab
+            for _ in range(MAX_CRUMBS)
+        ]
         self.time_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             header,
             text="",
@@ -182,134 +220,21 @@ class HubWindow(customtkinter.CTkToplevel):
         self.avatar_label.bind("<Button-1>", lambda _event: self.app.open_account(self))
         self.show_account()
 
-        add_rule(self.content, INK, padx=MARGIN, pady=(10, 14))
+        add_rule(self.content, INK, padx=MARGIN, pady=(6, 8))
 
         self.launcher: LauncherPanel = LauncherPanel(self.content, self.app)
-        self.launcher.pack(fill="x", padx=MARGIN, pady=(0, 8))
+        self.launcher.pack(fill="x", padx=MARGIN, pady=(0, 4))
 
-        # Pages swap in below the launcher, which stays on every page.
-        self.home_page = customtkinter.CTkFrame(
-            self.content,
-            fg_color="transparent",
-        )
-        self.calendar_page: CalendarPage | None = None
-        self.page_name: str = PAGES[0]
+        # Pages swap in below the launcher, which stays on every page. Home
+        # is built now; each app's page is built the first time it opens.
+        self.hub_apps: dict[str, HubApp] = {
+            hub_app.name: hub_app for hub_app in discover() if hub_app.name != HOME
+        }
+        self.home: HomePage = HomePage(self.content, self.app)
+        self.pages: dict[str, customtkinter.CTkFrame] = {HOME: self.home}
+        self.page_name: str = ""
+        self.show_page(HOME)
 
-        self.today_panel: TodayPanel = TodayPanel(self.home_page, self.app)
-        self.today_panel.pack(fill="x", padx=MARGIN, pady=(0, 24))
-
-        customtkinter.CTkLabel(
-            self.home_page,
-            text="NOW PLAYING",
-            font=mono(10, "bold"),
-            text_color=MUTED,
-            anchor="w",
-            height=16,
-        ).pack(fill="x", padx=MARGIN)
-
-        now_playing = customtkinter.CTkFrame(
-            self.home_page,
-            fg_color="transparent",
-        )
-        now_playing.pack(fill="x", padx=MARGIN, pady=(12, 0))
-
-        self.album_art_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
-            now_playing,
-            text="",
-            width=HUB_ART_SIZE,
-            height=HUB_ART_SIZE,
-        )
-        self.album_art_label.pack(side="left")
-
-        info = customtkinter.CTkFrame(now_playing, fg_color="transparent")
-        info.pack(side="left", fill="both", expand=True, padx=(28, 0))
-
-        self.song_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
-            info,
-            text="Checking Spotify...",
-            font=mono(16, "bold"),
-            text_color=INK,
-            anchor="w",
-            justify="left",
-            wraplength=500,
-        )
-        self.song_label.pack(fill="x", pady=(6, 0))
-        self.artist_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
-            info,
-            text="",
-            font=mono(12),
-            text_color=INK_SOFT,
-            anchor="w",
-        )
-        self.artist_label.pack(fill="x", pady=(4, 0))
-        self.meta_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
-            info,
-            text="",
-            font=mono(10),
-            text_color=MUTED,
-            anchor="w",
-        )
-        self.meta_label.pack(fill="x", pady=(2, 0))
-
-        controls = customtkinter.CTkFrame(info, fg_color="transparent")
-        controls.pack(anchor="w", pady=(18, 0))
-        self.outlined_buttons: list[customtkinter.CTkButton] = [
-            self.add_outlined_button(controls, "|<", 48, self.app.previous_song),
-        ]
-        self.play_pause_button: customtkinter.CTkButton = (
-            customtkinter.CTkButton(
-                controls,
-                text=">",
-                width=56,
-                height=34,
-                corner_radius=0,
-                border_width=0,
-                fg_color=INK,
-                hover_color=INK_SOFT,
-                text_color=BACKGROUND,
-                font=mono(14, "bold"),
-                command=self.app.toggle_playback,
-            )
-        )
-        self.play_pause_button.pack(side="left", padx=(0, 8))
-        self.outlined_buttons += [
-            self.add_outlined_button(controls, ">|", 48, self.app.next_song),
-            self.add_outlined_button(
-                controls,
-                "pop out ->",
-                110,
-                self.app.open_player,
-                padx=(20, 0),
-            ),
-        ]
-
-        columns = customtkinter.CTkFrame(self.home_page, fg_color="transparent")
-        columns.pack(fill="x", padx=MARGIN, pady=(SECTION_GAP, 0))
-        weather_column = customtkinter.CTkFrame(
-            columns,
-            width=WEATHER_COLUMN_WIDTH,
-            fg_color="transparent",
-        )
-        weather_column.pack(side="left", fill="y")
-        weather_column.pack_propagate(False)
-        self.weather_panel: WeatherPanel = WeatherPanel(
-            weather_column,
-            self.app,
-        )
-        self.weather_panel.pack(fill="x")
-        Starfield(weather_column, 0.03, 0.12).pack(
-            fill="both",
-            expand=True,
-            pady=(24, 0),
-        )
-        self.todo_panel: TodoPanel = TodoPanel(columns)
-        self.todo_panel.pack(side="left", fill="both", expand=True, padx=(40, 0))
-        Starfield(self.home_page, 0.12, 0.22).pack(fill="both", expand=True)
-
-        self.show_page(PAGES[0])
-        self.set_album_art(self.app.album_art_image)
-        if self.app.song is not None:
-            self.show_song(self.app.song)
         self.update_time()
         self.update_battery()
         # The suggestion dropdown floats above the panels packed after it.
@@ -317,27 +242,106 @@ class HubWindow(customtkinter.CTkToplevel):
         self.after(150, self.focus_launcher)
         self.after(ACTIVITY_CHECK_MS, self.check_activity)
 
+    # Pages
+
     def show_page(self, name: str) -> None:
-        if name == "calendar" and self.calendar_page is None:
-            # Built on first visit to keep the hub quick to open.
-            self.calendar_page = CalendarPage(self.content)
-        pages = {"home": self.home_page, "calendar": self.calendar_page}
-        for page_name, page in pages.items():
-            if page is not None and page_name != name:
-                page.pack_forget()
-        if name == "home":
-            self.home_page.pack(fill="both", expand=True)
-        else:
-            pages[name].pack(fill="both", expand=True, padx=MARGIN, pady=(0, 24))
-        self.page_name = name
-        for page_name, tab in self.page_tabs.items():
-            selected = page_name == name
-            tab.configure(
-                text=f"[{page_name}]" if selected else page_name,
-                text_color=INK if selected else MUTED,
+        if name not in self.pages:
+            self.pages[name] = self.hub_apps[name].build(self.content, self.app)
+        if name != self.page_name:
+            for page_name, page in self.pages.items():
+                if page_name != name:
+                    page.pack_forget()
+            self.pages[name].pack(fill="both", expand=True)
+            self.page_name = name
+            self.render_trail()
+            # Keep the launcher's dropdown above newly packed pages.
+            self.launcher.dropdown.lift()
+        self.call_pages("on_show", only=name)
+
+    def call_pages(self, method: str, *args: Any, only: str | None = None) -> None:
+        """Call an optional page hook (see apps/__init__.py) on every built
+        page, or on just one."""
+        for page_name, page in list(self.pages.items()):
+            if only is not None and page_name != only:
+                continue
+            hook = getattr(page, method, None)
+            if hook is not None:
+                hook(*args)
+
+    def data_changed(self, kinds: set[str]) -> None:
+        self.call_pages("data_changed", kinds)
+
+    def set_trail(self, page: customtkinter.CTkFrame, parts: list[str]) -> None:
+        """Show where an app is inside itself: ``["recipes", "carbonara"]``
+        reads "t1ld3 / cookbook / recipes / carbonara"."""
+        name = next(
+            (page_name for page_name, built in self.pages.items() if built is page),
+            None,
+        )
+        if name is None:
+            return
+        self.trails[name] = list(parts)
+        if name == self.page_name:
+            self.render_trail()
+
+    def render_trail(self) -> None:
+        crumbs = (
+            []
+            if self.page_name == HOME
+            else [self.page_name, *self.trails.get(self.page_name, [])]
+        )
+        crumbs = [shorten(crumb, CRUMB_CHARS) for crumb in crumbs][:MAX_CRUMBS]
+        # Fold the early middle crumbs into "…" (still clickable), keeping
+        # the one just before the end for context, then shorten that one.
+        for depth in range(1, len(crumbs) - 2):
+            if trail_length(crumbs) <= TRAIL_CHARS:
+                break
+            crumbs[depth] = "…"
+        if len(crumbs) > 2 and trail_length(crumbs) > TRAIL_CHARS:
+            spare = TRAIL_CHARS - trail_length(crumbs) + len(crumbs[-2])
+            crumbs[-2] = shorten(crumbs[-2], max(8, spare))
+        go_to_trail = getattr(self.pages[self.page_name], "go_to_trail", None)
+        for depth, (crumb, button) in enumerate(zip(crumbs, self.crumbs)):
+            # The last crumb is where you are, so it isn't a link.
+            link = depth < len(crumbs) - 1 and go_to_trail is not None
+            button.configure(
+                text=f"/ {crumb}",
+                text_color=MUTED if link else INK_SOFT,
+                hover=link,
+                command=(lambda chosen=depth: go_to_trail(chosen)) if link else None,
             )
-        # Keep the launcher's dropdown above newly packed pages.
-        self.launcher.dropdown.lift()
+        # Showing and hiding buttons costs far more than relabelling them,
+        # so only the ones past the old or new length change.
+        for depth, button in enumerate(self.crumbs):
+            shown = button.winfo_manager() == "pack"
+            if depth < len(crumbs) and not shown:
+                button.pack(side="left", padx=(2, 0))
+            elif depth >= len(crumbs) and shown:
+                button.pack_forget()
+
+    def open_app_menu(self) -> None:
+        names = [HOME, *self.hub_apps]
+        descriptions = {name: hub_app.description for name, hub_app in self.hub_apps.items()}
+        descriptions[HOME] = "today at a glance"
+        items = [
+            MenuItem(
+                name,
+                lambda chosen=name: self.show_page(chosen),
+                detail=descriptions[name] or " ",
+                # 1 to 9 open the first nine pages while the menu is open.
+                key=str(number) if number <= 9 else "",
+                current=name == self.page_name,
+            )
+            for number, name in enumerate(names, start=1)
+        ]
+        button = self.menu_button
+        self.app.show_menu_at(
+            self,
+            button.winfo_rootx(),
+            button.winfo_rooty() + button.winfo_height(),
+            items,
+            width=APP_MENU_WIDTH,
+        )
 
     def show_account(self) -> None:
         text, problem = self.app.account_label()
@@ -500,36 +504,8 @@ class HubWindow(customtkinter.CTkToplevel):
         self.focus_force()
         self.launcher.focus_prompt()
 
-    def add_outlined_button(
-        self,
-        parent: customtkinter.CTkFrame,
-        text: str,
-        width: int,
-        command: Any,
-        padx: tuple[int, int] = (0, 8),
-    ) -> customtkinter.CTkButton:
-        button = customtkinter.CTkButton(
-            parent,
-            text=text,
-            width=width,
-            height=34,
-            corner_radius=0,
-            border_width=outline_width(self),
-            border_color=INK,
-            fg_color="transparent",
-            hover_color=HOVER,
-            text_color=INK,
-            font=mono(12, "bold"),
-            command=command,
-        )
-        button.pack(side="left", padx=padx)
-        return button
-
     def refresh_outlines(self) -> None:
-        for button in self.outlined_buttons:
-            button.configure(border_width=outline_width(self))
-        self.weather_panel.refresh_outlines()
-        self.todo_panel.refresh_outlines()
+        self.call_pages("refresh_outlines")
         self.launcher.refresh_outlines()
 
     def update_battery(self) -> None:
@@ -555,30 +531,14 @@ class HubWindow(customtkinter.CTkToplevel):
         self.after(REFRESH_TIME * 1000, self.update_time)
 
     def show_song(self, song: dict[str, Any]) -> None:
-        self.song_label.configure(text=str(song["title"]))
-        self.artist_label.configure(text=song["artist"])
-        self.meta_label.configure(
-            text=" • ".join(
-                value for value in (song["album"], song["device"]) if value
-            )
-        )
-        self.play_pause_button.configure(
-            text="||" if song["is_playing"] else ">"
-        )
+        self.call_pages("show_song", song)
         self.idle_view.show_song(song)
 
     def show_song_error(self) -> None:
-        self.song_label.configure(text="Spotify unavailable :<")
-        self.artist_label.configure(text="Please open Spotify and try again")
-        self.meta_label.configure(text="")
+        self.call_pages("show_song_error")
 
     def set_album_art(self, images: ThemedImage) -> None:
-        self.album_art = customtkinter.CTkImage(
-            light_image=images[0],
-            dark_image=images[1],
-            size=(HUB_ART_SIZE, HUB_ART_SIZE),
-        )
-        self.album_art_label.configure(image=self.album_art)
+        self.call_pages("set_album_art", images)
         self.idle_view.set_album_art(images)
 
     def close_window(self, _event: tk.Event[tk.Misc] | None = None) -> str:

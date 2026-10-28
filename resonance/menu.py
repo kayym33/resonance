@@ -16,6 +16,7 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
+from .rich_text import RichText, scaled_pad
 from .windows import outline_width
 
 # Placed in a menu's item list to insert the size picker row.
@@ -29,6 +30,12 @@ class MenuItem:
     command: Callable[[], None]
     text_color: str = INK_SOFT
     enabled: bool = True
+    # Shown faded on the right. Runs of items with details are drawn as
+    # rows of one RichText instead of a button each.
+    detail: str = ""
+    # A key that chooses the item while the menu is open, shown before it.
+    key: str = ""
+    current: bool = False
 
 
 def mono(size: int, weight: str = "normal") -> customtkinter.CTkFont:
@@ -43,6 +50,7 @@ def build_context_menu(
     size_name: str,
     on_size: Callable[[str], None],
     on_close: Callable[[], None],
+    width: int = MENU_WIDTH,
 ) -> customtkinter.CTkToplevel:
     """Pop up a borderless menu at screen position (x, y).
 
@@ -69,7 +77,7 @@ def build_context_menu(
     # Sets the menu's minimum width; padded so it can't cover the border.
     customtkinter.CTkFrame(
         frame,
-        width=MENU_WIDTH,
+        width=width,
         height=1,
         fg_color="transparent",
     ).pack(padx=8, pady=(6, 0))
@@ -85,11 +93,36 @@ def build_context_menu(
         on_close()
         command()
 
+    rows: RichText | None = None
     for item in items:
         if item == SIZE_ROW:
+            rows = None
             add_size_row(frame, size_name, lambda name: choose(lambda: on_size(name)))
             continue
         assert isinstance(item, MenuItem)
+        if item.key:
+            menu.bind(f"<Key-{item.key}>", lambda _event, chosen=item: choose(chosen.command))
+        if item.detail:
+            if rows is None:
+                rows = RichText(frame)
+                # Rows never wrap, so fit_height is right before the menu
+                # is shown and its width known.
+                rows.configure(wrap="none")
+                rows.pack(fill="x", padx=scaled_pad(frame, 8), pady=scaled_pad(frame, (0, 4)))
+            # Lines up with the menu's title, which starts two spaces in.
+            key = f"  {item.key}  " if item.key else "  "
+            rows.row(
+                item.label,
+                f"{key}{'> ' if item.current else '  '}{item.label}",
+                item.detail,
+                lambda chosen=item: choose(chosen.command),
+                left_style="strong" if item.current else "body",
+            )
+            continue
+        if rows is not None:
+            rows.end_text()
+            rows.fit_height()
+            rows = None
         customtkinter.CTkButton(
             frame,
             text=item.label,
@@ -103,9 +136,12 @@ def build_context_menu(
             text_color=item.text_color,
             font=mono(11),
         ).pack(fill="x", padx=8, pady=2)
+    if rows is not None:
+        rows.end_text()
+        rows.fit_height()
     customtkinter.CTkFrame(
         frame,
-        width=MENU_WIDTH,
+        width=width,
         height=4,
         fg_color="transparent",
     ).pack(padx=8, pady=(0, 6))

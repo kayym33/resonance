@@ -14,10 +14,20 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
-from .events import DEFAULT_DURATION, Event, minutes, parse_day, parse_time
+from .events import (
+    DEFAULT_DURATION,
+    DEFAULT_REMIND,
+    Event,
+    minutes,
+    parse_day,
+    parse_time,
+)
+from .reminders import REMIND_CHOICES, remind_label
 from .windows import outline_width, prepare_window
 
 DIALOG_SIZE = (380, 285)
+TIME_FIELD_WIDTH = 100
+REMIND_FIELD_WIDTH = 116
 
 
 def mono(size: int, weight: str = "normal") -> customtkinter.CTkFont:
@@ -42,6 +52,7 @@ class EventDialog(customtkinter.CTkToplevel):
     ) -> None:
         super().__init__(parent)
         self.event: Event | None = event
+        self.remind: int | None = event.remind if event else DEFAULT_REMIND
         self.on_save = on_save
         self.on_delete = on_delete
         self.title("edit event" if event else "new event")
@@ -85,6 +96,11 @@ class EventDialog(customtkinter.CTkToplevel):
             side="left",
             placeholder="",
         )
+        self.remind_button = self.add_remind_field(times)
+        self.start_entry.bind(
+            "<KeyRelease>", lambda _event: self.show_remind(), add="+"
+        )
+        self.show_remind()
 
         self.error_label = customtkinter.CTkLabel(
             body,
@@ -147,7 +163,7 @@ class EventDialog(customtkinter.CTkToplevel):
         ).pack(fill="x")
         entry = customtkinter.CTkEntry(
             field,
-            width=150 if side == "left" else 340,
+            width=TIME_FIELD_WIDTH if side == "left" else 340,
             height=30,
             corner_radius=0,
             border_width=outline_width(self),
@@ -161,6 +177,52 @@ class EventDialog(customtkinter.CTkToplevel):
         if value:
             entry.insert(0, value)
         return entry
+
+    def add_remind_field(self, parent: customtkinter.CTkFrame) -> customtkinter.CTkButton:
+        """Click to cycle off, at start, 5 min before ... 1 hour before."""
+        field = customtkinter.CTkFrame(parent, fg_color="transparent")
+        field.pack(side="left", pady=(0, 10))
+        customtkinter.CTkLabel(
+            field,
+            text="REMIND",
+            font=mono(10, "bold"),
+            text_color=MUTED,
+            anchor="w",
+            height=16,
+        ).pack(fill="x")
+        button = customtkinter.CTkButton(
+            field,
+            text="",
+            width=REMIND_FIELD_WIDTH,
+            height=30,
+            corner_radius=0,
+            border_width=outline_width(self),
+            border_color=INK,
+            fg_color="transparent",
+            hover_color=HOVER,
+            text_color=INK,
+            text_color_disabled=MUTED,
+            font=mono(11),
+            anchor="w",
+            command=self.cycle_remind,
+        )
+        button.pack(anchor="w")
+        return button
+
+    def cycle_remind(self) -> None:
+        choices = REMIND_CHOICES
+        index = choices.index(self.remind) if self.remind in choices else -1
+        self.remind = choices[(index + 1) % len(choices)]
+        self.show_remind()
+
+    def show_remind(self) -> None:
+        """All-day events don't remind, so the button rests until there's
+        a start time."""
+        all_day = not self.start_entry.get().strip()
+        self.remind_button.configure(
+            text=f" {'all day' if all_day else remind_label(self.remind)}",
+            state="disabled" if all_day else "normal",
+        )
 
     def add_button(
         self,
@@ -206,6 +268,7 @@ class EventDialog(customtkinter.CTkToplevel):
 
         event = self.event or Event(title, day)
         event.title, event.day, event.start, event.end = title, day, start, end
+        event.remind = self.remind
         self.on_save(event)
         self.destroy()
         return "break"

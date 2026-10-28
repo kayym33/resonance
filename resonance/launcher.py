@@ -83,6 +83,7 @@ BUILTINS: dict[str, str] = {
     "player": "pop out the player",
     "play": "play a song on Spotify",
     "todo": "add a to-do",
+    "phone": "send a note to your phone",
     "cal": "open the calendar",
     "home": "back to the home page",
     "account": "sign in or manage your account",
@@ -109,8 +110,10 @@ class Suggestion:
     """One row in the launcher list.
 
     ``kind`` is "run" (start ``command`` with ``args``), "builtin" (app
-    action named by ``args``), "play" (Spotify search for ``args``),
-    "todo" (add ``args`` as a task) or "calc" (``args`` is the result).
+    action named by ``args``), "page" (open the hub app named ``args``),
+    "play" (Spotify search for ``args``), "todo" (add ``args`` as a task),
+    "phone" (push ``args`` to the phone app) or "calc" (``args`` is the
+    result).
     """
 
     title: str
@@ -238,7 +241,13 @@ def match_rank(text: str, names: tuple[str, ...], description: str) -> int | Non
     return None
 
 
-def suggest(text: str, commands: list[Command]) -> list[Suggestion]:
+def suggest(
+    text: str,
+    commands: list[Command],
+    pages: dict[str, str] | None = None,
+) -> list[Suggestion]:
+    """Rank what ``text`` could mean. ``pages`` maps the hub's app names
+    to their descriptions."""
     stripped = text.strip()
     if not stripped:
         return []
@@ -270,6 +279,16 @@ def suggest(text: str, commands: list[Command]) -> list[Suggestion]:
                     "add to your list" if args else "type a task",
                     text,
                     "todo" if args else "none",
+                    args,
+                )
+            ]
+        if word == "phone":
+            return [
+                Suggestion(
+                    f"phone {args}" if args else "phone",
+                    "send to your phone" if args else "type a note",
+                    text,
+                    "phone" if args else "none",
                     args,
                 )
             ]
@@ -305,9 +324,22 @@ def suggest(text: str, commands: list[Command]) -> list[Suggestion]:
                         name,
                         description,
                         f"{name} ",
-                        "none" if name in ("play", "todo") else "builtin",
+                        "none" if name in ("play", "todo", "phone") else "builtin",
                         name,
                     ),
+                )
+            )
+    for index, (name, description) in enumerate((pages or {}).items()):
+        if name in BUILTINS:
+            continue
+        detail = description or f"open {name}"
+        rank = match_rank(stripped.lower(), (name,), detail)
+        if rank is not None:
+            ranked.append(
+                (
+                    rank,
+                    len(commands) + len(BUILTINS) + index,
+                    Suggestion(name, detail, f"{name} ", "page", name),
                 )
             )
     suggestions = [suggestion for *_, suggestion in sorted(ranked)]
