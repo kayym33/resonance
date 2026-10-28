@@ -29,7 +29,7 @@ nothing to separate between people.
 3. **Send them:**
    - the download link: <https://github.com/kayym33/resonance/releases/latest>
    - their email and temporary password
-   - the phone app address: <https://kayym33.github.io/resonance/>
+   - the phone app address: <https://t1ld3.kaylamc.uk/>
    - the "For them" section below
 
 ## For them
@@ -51,7 +51,7 @@ nothing to separate between people.
 
 ### On an iPhone
 
-1. Open <https://kayym33.github.io/resonance/> in **Safari** and sign in
+1. Open <https://t1ld3.kaylamc.uk/> in **Safari** and sign in
    with the same account.
 2. Tap **Share → Add to Home Screen**, then open t1ld3 from the new icon.
 3. Go to **me**, tap **turn on** under notifications and allow them, then

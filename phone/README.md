@@ -52,11 +52,14 @@ You need the Supabase dashboard, a terminal in this repo (with Node, for
    select vault.create_secret('<the random secret>', 't1ld3_cron_secret');
    ```
 
-5. **Hosting.** In the GitHub repo, go to Settings → Pages and set Source
-   to **GitHub Actions**. The next push to `main` that touches `phone/`
-   deploys it (`.github/workflows/phone.yml`), or you can run the workflow
-   by hand from the Actions tab. The app lives at
-   <https://kayym33.github.io/resonance/>.
+5. **Hosting.** GitHub Pages serves the app at <https://t1ld3.kaylamc.uk/>
+   (Settings → Pages: Source **GitHub Actions**, custom domain
+   `t1ld3.kaylamc.uk`, Enforce HTTPS). The DNS for kaylamc.uk is at LCN,
+   where `t1ld3` is a CNAME to `kayym33.github.io`. Every push to `main`
+   that touches `phone/` deploys it (`.github/workflows/phone.yml`), or
+   run the workflow by hand from the Actions tab. Keep the address: the
+   phone keeps its sign-in, data and notification permission per address,
+   so moving it means adding it to the home screen again.
 
 ## On the iPhone
 
@@ -83,6 +86,14 @@ app, not in a Safari tab.
   closed. `supabase/functions/reminders` sends those and event
   reminders every minute, in each phone's own time zone
   (`tests/reminders.mjs` tests the timing).
+- `js/gestures.js` makes it feel like an iPhone app: swipe back from
+  the left edge (only from the home screen; in Safari, Safari's own swipe
+  does it), swipe a to-do right to tick it or left to delete it, swipe
+  between cooking steps, and pull down to sync. Pages slide in and out
+  like iOS ones, each page remembers its scroll position, and tapping the
+  tab you're on goes back to its first page. `splash/` holds a launch
+  screen for each iPhone size; a new iPhone size needs its own image, or
+  it opens on a blank screen.
 - `?api=<url>` points a copy served from `localhost` at a stand-in
   server, for testing. It's ignored anywhere else, so a link can't send
   your password to another server.

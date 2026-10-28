@@ -3,7 +3,7 @@
 const CACHE = "t1ld3-shell";
 const SHELL = [
   "./", "index.html", "style.css", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png",
-  "js/app.js", "js/cloud.js", "js/config.js", "js/data.js", "js/events.js", "js/push.js",
+  "js/app.js", "js/cloud.js", "js/config.js", "js/data.js", "js/events.js", "js/gestures.js", "js/push.js",
   "js/recipes.js", "js/store.js", "js/timers.js", "js/ui.js",
   "js/views/calendar.js", "js/views/cookbook.js", "js/views/me.js", "js/views/today.js", "js/views/todo.js",
 ];

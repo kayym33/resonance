@@ -53,3 +53,23 @@ export function longDate(date = new Date()) {
 export function shorten(text, limit) {
   return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
 }
+
+// A light tap of the haptic engine. iOS gives web apps no API for it, but
+// since iOS 18 Safari ticks when a switch is toggled, so this toggles a
+// hidden one. Elsewhere it does nothing. Only works during a tap.
+export function haptic() {
+  try {
+    const label = document.createElement("label");
+    label.ariaHidden = "true";
+    label.style.display = "none";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.setAttribute("switch", "");
+    label.append(input);
+    document.head.append(label);
+    label.click();
+    label.remove();
+  } catch {
+    // No haptics here.
+  }
+}

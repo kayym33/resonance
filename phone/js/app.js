@@ -4,9 +4,11 @@
 // the handlers here dispatch to by name (data-action="todo-toggle").
 import { Cloud } from "./cloud.js";
 import { Data } from "./data.js";
+import { installGestures } from "./gestures.js";
+import { isStandalone } from "./push.js";
 import { Store, SyncEngine } from "./store.js";
 import { Timers } from "./timers.js";
-import { esc } from "./ui.js";
+import { esc, haptic } from "./ui.js";
 import * as calendar from "./views/calendar.js";
 import * as cookbook from "./views/cookbook.js";
 import * as me from "./views/me.js";
@@ -46,18 +48,25 @@ const ACTIONS = handlers("actions");
 const FORMS = handlers("forms");
 const INPUTS = handlers("inputs");
 const SWIPES = handlers("swipes");
+// Taps that tick, the way native toggles and steppers do.
+const HAPTIC_ACTIONS = new Set(["todo-toggle", "todo-delete", "cook-favourite", "cook-step", "cook-servings", "cook-timer"]);
 
 let currentPath = null;
 let currentName = null;
+let currentTab = null;
+// Each page's scroll position, so going back lands where you were.
+const scrolls = new Map();
 let flashMessage = null;
 let flashShown = false;
 let flashTimer = null;
 
 const ctx = {
   cloud, data, store, sync, timers,
+  // Shows the page straight away. Setting location.hash instead would wait
+  // for the browser's hashchange event, a visible pause on a phone.
   go(path) {
-    if (location.hash === `#${path}`) render();
-    else location.hash = `#${path}`;
+    if (location.hash !== `#${path}`) history.pushState(null, "", `#${path}`);
+    render();
   },
   render,
   // A one-line message on the next view, like the desktop's.
@@ -79,6 +88,28 @@ function route() {
     if (match) return { path, name, view, tab, params: match.groups ?? {} };
   }
   return { path: "/", name: "today", view: today.render, tab: "/", params: {} };
+}
+
+// Where swiping back from the left edge goes; null on a tab's first page.
+function parentOf(current) {
+  const id = current.params.id;
+  switch (current.name) {
+    case "event": return "/cal";
+    case "recipe": return "/cook";
+    case "cooking": return `/cook/${id}`;
+    case "recipe-edit": return id === "new" ? "/cook" : `/cook/${id}`;
+    default: return null;
+  }
+}
+
+const depth = (path) => path.split("/").filter(Boolean).length;
+
+// How a new page arrives: sliding in from the right when going deeper,
+// back from the left when coming up. Tabs swap instantly, as in iOS; even
+// a short fade reads as a flicker there.
+function entrance(current) {
+  if (currentPath === null || current.tab !== currentTab) return "";
+  return depth(current.path) < depth(currentPath) ? "pop" : "push";
 }
 
 function crumbHtml(crumbs) {
@@ -106,7 +137,10 @@ function render() {
   const signedIn = cloud.signedIn;
   const result = signedIn ? current.view(ctx, current.params) : me.renderSignIn();
   const sameRoute = current.path === currentPath;
-  const scroll = sameRoute ? window.scrollY : 0;
+  const enter = sameRoute ? "" : entrance(current);
+  if (!sameRoute && currentPath !== null) scrolls.set(currentPath, window.scrollY);
+  // A page pushed on top starts at the top; one you return to doesn't.
+  const scroll = sameRoute ? window.scrollY : enter === "push" ? 0 : scrolls.get(current.path) ?? 0;
   const focus = sameRoute ? focusedField() : null;
   if (!sameRoute) {
     cookbook.onRoute(current, currentName);
@@ -115,6 +149,7 @@ function render() {
   }
   currentPath = current.path;
   currentName = current.name;
+  currentTab = current.tab;
 
   document.querySelector(".trail").innerHTML = crumbHtml(result.crumbs);
   document.querySelector("nav").hidden = !signedIn;
@@ -125,6 +160,12 @@ function render() {
   main.innerHTML = (flashMessage ? `<p class="flash">${esc(flashMessage)}</p>` : "") + result.html;
   flashShown = Boolean(flashMessage);
   window.scrollTo(0, scroll);
+  if (enter) {
+    // Restarted each time, so quick taps still animate.
+    delete main.dataset.enter;
+    void main.offsetWidth;
+    main.dataset.enter = enter;
+  }
   if (focus) {
     const field = main.querySelector(focus.key);
     if (field) {
@@ -181,6 +222,7 @@ document.addEventListener("click", (event) => {
   const name = target.dataset.action;
   if (name === "go") return ctx.go(target.dataset.to);
   if (name === "timer-dismiss") return timers.dismiss(target.dataset.id);
+  if (HAPTIC_ACTIONS.has(name)) haptic();
   ACTIONS[name]?.(ctx, { ...target.dataset }, target);
 });
 
@@ -196,22 +238,72 @@ document.addEventListener("input", (event) => {
   if (name) INPUTS[name]?.(ctx, event.target);
 });
 
-let touchStart = null;
-document.addEventListener("touchstart", (event) => {
-  const area = event.target.closest("[data-swipe]") ?? (main.classList.contains("cooking") ? main.querySelector("[data-swipe]") : null);
-  touchStart = area ? { name: area.dataset.swipe, x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
-}, { passive: true });
-document.addEventListener("touchend", (event) => {
-  if (!touchStart) return;
-  const dx = event.changedTouches[0].clientX - touchStart.x;
-  const dy = event.changedTouches[0].clientY - touchStart.y;
-  if (Math.abs(dx) > 60 && Math.abs(dy) < 50) SWIPES[touchStart.name]?.(ctx, dx < 0 ? 1 : -1);
-  touchStart = null;
-}, { passive: true });
+main.addEventListener("animationend", () => delete main.dataset.enter);
+
+let pulling = false;
+const gestures = installGestures({
+  main,
+  standalone: isStandalone,
+  parent: () => (cloud.signedIn ? parentOf(route()) : null),
+  onBack: (path) => ctx.go(path),
+  onRowAction(name, dataset) {
+    ACTIONS[name]?.(ctx, dataset);
+  },
+  // In cooking mode, a swipe anywhere on the page changes step.
+  swipeArea: () => (main.classList.contains("cooking") ? main.querySelector("[data-swipe]") : null),
+  onSwipe(name, direction) {
+    SWIPES[name]?.(ctx, direction);
+  },
+  pulling: () => pulling,
+  async onPull() {
+    pulling = true;
+    await sync.syncNow();
+    pulling = false;
+    gestures.pullDone();
+  },
+});
+
+// Tabs switch the moment a finger touches them, as iOS tab bars do:
+// waiting for the tap to finish (the click) is what made switching feel
+// slow. Tapping the tab you're on goes back to its first page, or to the top.
+function chooseTab(link) {
+  const tab = link.getAttribute("href").slice(1);
+  const current = route();
+  if (tab !== current.tab) ctx.go(tab);
+  else if (current.path !== current.tab) ctx.go(current.tab);
+  else window.scrollTo({ top: 0, behavior: "smooth" });
+}
+const nav = document.querySelector("nav");
+nav.addEventListener("pointerdown", (event) => {
+  const link = event.target.closest("a");
+  if (link && event.isPrimary) chooseTab(link);
+});
+nav.addEventListener("click", (event) => {
+  const link = event.target.closest("a");
+  if (!link) return;
+  event.preventDefault();
+  // Pressing Enter on a focused tab is a click with no pointer before it.
+  if (event.detail === 0) chooseTab(link);
+});
+
+// The tab bar steps aside while the keyboard is up, as in iOS apps.
+const typingField = (element) => element?.matches?.("input:not([type=checkbox]), textarea, select");
+document.addEventListener("focusin", (event) => {
+  if (typingField(event.target)) document.body.classList.add("typing");
+});
+document.addEventListener("focusout", () => {
+  // Focus may be moving straight to another field.
+  setTimeout(() => document.body.classList.toggle("typing", typingField(document.activeElement)), 50);
+});
 
 // Keep the views current.
 
-window.addEventListener("hashchange", render);
+// Links in the header trail change the hash; the back button pops it.
+const followAddress = () => {
+  if (route().path !== currentPath) render();
+};
+window.addEventListener("hashchange", followAddress);
+window.addEventListener("popstate", followAddress);
 store.listeners.push((kinds) => {
   if (kinds.has("setting")) applyTheme();
   // Synced changes mustn't wipe what someone is typing into an editor.
@@ -238,6 +330,9 @@ setInterval(() => {
   if (document.visibilityState === "visible") sync.syncNow();
 }, SYNC_INTERVAL_MS);
 
+// The app restores each page's scroll itself; the browser doing it too
+// makes the page jump.
+history.scrollRestoration = "manual";
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 fillNoise();
 applyTheme();
