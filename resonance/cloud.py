@@ -190,6 +190,18 @@ class Cloud:
     def change_password(self, password: str) -> None:
         self.request("PUT", "/auth/v1/user", {"password": password})
 
+    # Phone
+
+    def send_to_phone(self, title: str, body: str) -> int:
+        """Push a notification to the phones this account installed the
+        phone app on (supabase/functions/push). Returns how many got it."""
+        result = self.request(
+            "POST",
+            "/functions/v1/push",
+            {"title": title, "body": body},
+        )
+        return int(result.get("sent", 0)) if isinstance(result, dict) else 0
+
     # Items
 
     def push(self, records: list[dict[str, Any]]) -> None:

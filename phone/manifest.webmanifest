@@ -1,0 +1,15 @@
+{
+  "name": "t1ld3",
+  "short_name": "t1ld3",
+  "description": "to-dos, calendar and cookbook, synced with the t1ld3 desktop app",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E7E7DD",
+  "theme_color": "#E7E7DD",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

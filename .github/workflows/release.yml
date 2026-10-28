@@ -101,6 +101,7 @@ jobs:
             --add-data "assets\terminal_theme.json;assets" `
             --add-data "assets\icon.ico;assets" `
             --add-data "assets\quotes.json;assets" `
+            --collect-submodules resonance.apps `
             main.py
 
       - name: Add copy for pre-rename updaters
@@ -144,6 +145,7 @@ jobs:
             --add-data "assets/terminal_theme.json:assets" \
             --add-data "assets/icon.ico:assets" \
             --add-data "assets/quotes.json:assets" \
+            --collect-submodules resonance.apps \
             main.py
 
       - name: Add Linux executable to the release

@@ -23,6 +23,7 @@ from .launcher import (
 )
 from .paths import DATA_DIR
 from .events import EVENTS
+from .recipes import RECIPES
 from .settings import SETTINGS
 from .store import Collection, parse_iso
 from .todo import TASKS
@@ -32,7 +33,11 @@ if TYPE_CHECKING:
     from .app import ResonanceApp
 
 SYNC_STATE_PATH = DATA_DIR / "sync.json"
-SYNCED: tuple[Collection, ...] = (TASKS, EVENTS, SETTINGS, PROFILE)
+SYNCED: tuple[Collection, ...] = (TASKS, EVENTS, SETTINGS, PROFILE, RECIPES)
+# Kinds newer than some servers' schema. They're uploaded on their own, so
+# a server that hasn't run the latest supabase/schema.sql rejects only
+# them (they stay dirty until it does) instead of the whole sync.
+NEWER_KINDS: frozenset[str] = frozenset({"recipe"})
 SYNC_INTERVAL: int = 60
 # Wait this long after an edit, so a burst of edits syncs once.
 EDIT_DELAY_MS: int = 2000
@@ -120,7 +125,7 @@ class SyncEngine:
         if commands is not None:
             outgoing.append(commands)
         self.set_status("syncing")
-        future: Future[list[dict[str, Any]]] = self.app.worker.submit(
+        future: Future[tuple[list[dict[str, Any]], set[str]]] = self.app.worker.submit(
             self.exchange,
             outgoing,
             self.state.get("cursor"),
@@ -133,20 +138,34 @@ class SyncEngine:
         self,
         outgoing: list[dict[str, Any]],
         cursor: str | None,
-    ) -> list[dict[str, Any]]:
-        """Worker thread: upload, then download what's new."""
-        for start in range(0, len(outgoing), PUSH_BATCH):
-            self.cloud.push(outgoing[start:start + PUSH_BATCH])
-        return self.cloud.pull(cursor)
+    ) -> tuple[list[dict[str, Any]], set[str]]:
+        """Worker thread: upload, then download what's new. Also returns
+        the newer kinds the server refused (see NEWER_KINDS)."""
+        established = [row for row in outgoing if row["kind"] not in NEWER_KINDS]
+        for start in range(0, len(established), PUSH_BATCH):
+            self.cloud.push(established[start:start + PUSH_BATCH])
+        refused: set[str] = set()
+        for kind in NEWER_KINDS:
+            rows = [row for row in outgoing if row["kind"] == kind]
+            try:
+                for start in range(0, len(rows), PUSH_BATCH):
+                    self.cloud.push(rows[start:start + PUSH_BATCH])
+            except AuthError:
+                raise
+            except CloudError as error:
+                if "items_kind_check" not in str(error):
+                    raise
+                refused.add(kind)
+        return self.cloud.pull(cursor), refused
 
     def apply_sync(
         self,
-        future: Future[list[dict[str, Any]]],
+        future: Future[tuple[list[dict[str, Any]], set[str]]],
         outgoing: list[dict[str, Any]],
     ) -> None:
         self.busy = False
         try:
-            rows = future.result()
+            rows, refused = future.result()
         except AuthError as error:
             if self.cloud.signed_in:
                 self.set_status("error", str(error))
@@ -157,14 +176,20 @@ class SyncEngine:
             self.set_status("offline", str(error))
             return
 
-        self.mark_pushed(outgoing)
+        self.mark_pushed([row for row in outgoing if row["kind"] not in refused])
         changed = self.merge(rows)
         if rows:
             newest = max(rows, key=lambda row: parse_iso(row["server_updated_at"]))
             self.state["cursor"] = newest["server_updated_at"]
         save_state(self.state)
         self.last_synced = time.time()
-        self.set_status("synced")
+        if refused:
+            self.set_status(
+                "synced",
+                "recipes wait for the server: run supabase/schema.sql",
+            )
+        else:
+            self.set_status("synced")
         if changed:
             self.app.data_changed(changed)
         if self.pending:

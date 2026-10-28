@@ -10,7 +10,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
 from tkinter import messagebox
-from typing import Any
+from typing import Any, Callable
 from urllib.request import urlopen
 
 import customtkinter
@@ -31,13 +31,16 @@ from .backend import (
     get_current_song,
     next_song,
     previous_song,
+    seek_playback,
+    set_volume,
     toggle_playback,
 )
+from .cloud import CloudError
 from .constants import APP_NAME, APP_SIZES, APP_VERSION, DEFAULT_SIZE
 from .events import load_events
 from .hub import HubWindow
 from .instance import listen
-from .menu import MenuItem, build_context_menu
+from .menu import MENU_WIDTH, MenuItem, build_context_menu
 from . import notify
 from .reminders import due_reminders, prune_sent, reminder_key, reminder_text
 from .settings import (
@@ -72,6 +75,12 @@ class ResonanceApp(customtkinter.CTk):
     def __init__(self) -> None:
         super().__init__()
         self.withdraw()
+        if sys.platform.startswith("linux"):
+            # Tk registers every window it creates with the X input method
+            # (ibus on GNOME), which cost 40ms a window here: whole pages
+            # drew line by line. Typing, accents included, still works;
+            # compose sequences and non-Latin input methods don't.
+            self.tk.call("tk", "useinputmethods", "0")
         self.title(APP_NAME)
         prepare_window(self)
         # Spotify, album art, weather, sync and sign-in can all be waiting at
@@ -210,7 +219,7 @@ class ResonanceApp(customtkinter.CTk):
     def weather_updated(self, weather: dict[str, Any]) -> None:
         self.weather = weather
         if self.hub is not None:
-            self.hub.today_panel.refresh()
+            self.hub.home.today_panel.refresh()
         self.update_theme()
 
     # Day and night themes
@@ -263,18 +272,45 @@ class ResonanceApp(customtkinter.CTk):
             return
         for event in due:
             self.reminders_sent.add(reminder_key(event))
-            title, body = reminder_text(event, now)
-            self.worker.submit(notify.send, title, body).add_done_callback(
-                lambda future, title=title, body=body: self.after(
-                    0, self.reminder_sent, future, title, body
-                )
-            )
+            self.notify(*reminder_text(event, now))
         self.reminders_sent = prune_sent(self.reminders_sent, now.date())
         save_device_setting("reminders_sent", sorted(self.reminders_sent))
 
-    def reminder_sent(self, future: Future[bool], title: str, body: str) -> None:
-        """Show the reminder in a corner of the screen if the system
-        couldn't."""
+    def notify(self, title: str, body: str, phone: bool = False) -> None:
+        """Send a system notification, falling back to an in-app toast.
+        With ``phone``, also push it to the phone app when signed in."""
+        self.worker.submit(notify.send, title, body).add_done_callback(
+            lambda future: self.after(0, self.notification_sent, future, title, body)
+        )
+        if phone and self.sync.cloud.signed_in:
+            # Best effort: a phone that isn't set up just doesn't buzz.
+            self.send_to_phone(title, body, lambda _error: None)
+
+    def send_to_phone(
+        self,
+        title: str,
+        body: str,
+        on_done: Callable[[str | None], None],
+    ) -> None:
+        """Push to the phone app; ``on_done`` gets an error or None, on the
+        Tk thread."""
+        if not self.sync.cloud.signed_in:
+            on_done("sign in first (account)")
+            return
+        future = self.worker.submit(self.sync.cloud.send_to_phone, title, body)
+
+        def finished(done: Future[int]) -> None:
+            try:
+                sent = done.result()
+            except CloudError as error:
+                on_done(str(error))
+                return
+            on_done(None if sent else "no phone set up yet")
+
+        future.add_done_callback(lambda done: self.after(0, finished, done))
+
+    def notification_sent(self, future: Future[bool], title: str, body: str) -> None:
+        """Show the note in a corner of the screen if the system couldn't."""
         try:
             shown = future.result()
         except Exception:
@@ -286,16 +322,8 @@ class ResonanceApp(customtkinter.CTk):
         """Synced data changed underneath the UI; refresh what shows it."""
         if "setting" in kinds:
             self.update_theme()
-        hub = self.hub
-        if hub is not None:
-            if kinds & {"task", "event"}:
-                hub.today_panel.refresh()
-            if "task" in kinds:
-                hub.todo_panel.reload()
-            if "event" in kinds and hub.calendar_page is not None:
-                hub.calendar_page.reload()
-            if "setting" in kinds:
-                hub.weather_panel.reload()
+        if self.hub is not None:
+            self.hub.data_changed(kinds)
         if "profile" in kinds:
             self.profile_changed()
 
@@ -319,15 +347,27 @@ class ResonanceApp(customtkinter.CTk):
         event: tk.Event[tk.Misc],
         items: list[MenuItem | str],
     ) -> None:
+        self.show_menu_at(owner, event.x_root, event.y_root, items)
+
+    def show_menu_at(
+        self,
+        owner: customtkinter.CTkToplevel,
+        x: int,
+        y: int,
+        items: list[MenuItem | str],
+        width: int = MENU_WIDTH,
+    ) -> None:
+        """Open a menu with its top-left corner at screen position (x, y)."""
         self.close_context_menu()
         self.context_menu = build_context_menu(
             owner,
-            event.x_root,
-            event.y_root,
+            x,
+            y,
             items,
             self.size_name,
             self.set_size,
             self.close_context_menu,
+            width,
         )
 
     def close_context_menu(self) -> None:
@@ -520,6 +560,14 @@ class ResonanceApp(customtkinter.CTk):
 
     def next_song(self) -> None:
         self.worker.submit(next_song)
+        self.after(250, self.refresh_song)
+
+    def seek(self, position_ms: int) -> None:
+        self.worker.submit(seek_playback, position_ms)
+        self.after(250, self.refresh_song)
+
+    def change_volume(self, percent: int) -> None:
+        self.worker.submit(set_volume, percent)
         self.after(250, self.refresh_song)
 
     def run(self) -> None:

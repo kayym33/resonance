@@ -9,6 +9,7 @@ import customtkinter
 from .backend import play_search
 from .constants import (
     ACCENT_DARK,
+    APP_NAME,
     BACKGROUND,
     INK,
     INK_SOFT,
@@ -25,6 +26,7 @@ from .launcher import (
     run_command,
     suggest,
 )
+from .todo import add_task
 from .windows import add_rule, cancel_pending_after, outline_width
 
 if TYPE_CHECKING:
@@ -172,7 +174,13 @@ class LauncherPanel(customtkinter.CTkFrame):
             self.update_suggestions()
 
     def update_suggestions(self) -> None:
-        self.suggestions = suggest(self.entry.get(), self.commands)
+        hub = self.app.hub
+        pages = (
+            {name: hub_app.description for name, hub_app in hub.hub_apps.items()}
+            if hub is not None
+            else {}
+        )
+        self.suggestions = suggest(self.entry.get(), self.commands, pages)
         self.selected = 0
         self.render_suggestions()
 
@@ -257,10 +265,19 @@ class LauncherPanel(customtkinter.CTkFrame):
             )
             future.add_done_callback(self.play_request_finished)
         elif suggestion.kind == "todo":
-            hub = self.app.hub
-            if hub is not None:
-                hub.todo_panel.add_task(suggestion.args)
-                self.show_status(f"added: {suggestion.args}")
+            # Every to-do panel listens for new tasks.
+            add_task(suggestion.args)
+            self.show_status(f"added: {suggestion.args}")
+        elif suggestion.kind == "phone":
+            note = suggestion.args
+            self.show_status("sending to your phone...")
+            self.app.send_to_phone(
+                APP_NAME,
+                note,
+                lambda error: self.phone_sent(note, error),
+            )
+        elif suggestion.kind == "page" and self.app.hub is not None:
+            self.app.hub.show_page(suggestion.args)
         elif suggestion.args in ("cal", "home") and self.app.hub is not None:
             self.app.hub.show_page("calendar" if suggestion.args == "cal" else "home")
         elif suggestion.args == "account" and self.app.hub is not None:
@@ -273,6 +290,13 @@ class LauncherPanel(customtkinter.CTkFrame):
             self.app.open_player()
         elif suggestion.args == "quit":
             self.app.quit_app()
+
+    def phone_sent(self, note: str, error: str | None) -> None:
+        if self.winfo_exists():
+            self.show_status(
+                f"couldn't send: {error}" if error else f"sent: {note}",
+                error=error is not None,
+            )
 
     def play_request_finished(self, future: Future[str]) -> None:
         self.after(0, self.apply_play_result, future)

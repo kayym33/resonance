@@ -27,6 +27,7 @@ from .events import (
     load_events,
     save_event,
 )
+from .line_scrollbar import LineScrollbar
 from .theme import color, unwatch, watch
 from .windows import cancel_pending_after, outline_width
 
@@ -112,13 +113,7 @@ class CalendarPage(customtkinter.CTkFrame):
             highlightthickness=0,
             bd=0,
         )
-        self.scrollbar = customtkinter.CTkScrollbar(
-            self.body,
-            command=self.grid_canvas.yview,
-            fg_color=BACKGROUND,
-            button_color=HOVER,
-            button_hover_color=RULE,
-        )
+        self.scrollbar = LineScrollbar(self.body, command=self.grid_canvas.yview)
         self.grid_canvas.configure(yscrollcommand=self.scrollbar.set)
         self.scrollbar.pack(side="right", fill="y")
         self.grid_canvas.pack(side="left", fill="both", expand=True)
