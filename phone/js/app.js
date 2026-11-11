@@ -47,6 +47,7 @@ const handlers = (kind) => Object.assign({}, ...VIEWS.map((view) => view[kind] ?
 const ACTIONS = handlers("actions");
 const FORMS = handlers("forms");
 const INPUTS = handlers("inputs");
+const BLURS = handlers("blurs");
 const SWIPES = handlers("swipes");
 // Taps that tick, the way native toggles and steppers do.
 const HAPTIC_ACTIONS = new Set(["todo-toggle", "todo-delete", "cook-favourite", "cook-step", "cook-servings", "cook-timer"]);
@@ -236,6 +237,21 @@ document.addEventListener("submit", (event) => {
 document.addEventListener("input", (event) => {
   const name = event.target.dataset?.input;
   if (name) INPUTS[name]?.(ctx, event.target);
+});
+
+// Leaving a field (data-blur="name"). Run once the tap that moved the
+// focus has done its own work, such as ticking the task being edited.
+document.addEventListener("focusout", (event) => {
+  const name = event.target.dataset?.blur;
+  if (name) setTimeout(() => BLURS[name]?.(ctx, event.target), 0);
+});
+
+// Esc in a field with data-cancel="action" (a keyboard, not a phone).
+document.addEventListener("keydown", (event) => {
+  const name = event.key === "Escape" ? event.target.dataset?.cancel : null;
+  if (!name) return;
+  event.preventDefault();
+  ACTIONS[name]?.(ctx, { ...event.target.dataset }, event.target);
 });
 
 main.addEventListener("animationend", () => delete main.dataset.enter);
