@@ -46,6 +46,11 @@
 * { box-sizing: border-box; }
 
 html {
+  /* Below a short page the browser shows html's background, not body's.
+     index.html sets it from the system theme so the first paint isn't
+     white; this follows the app's own day/night choice once it loads, or
+     a day app on a dark phone shows black between the page and the tabs. */
+  background: var(--background);
   -webkit-text-size-adjust: 100%;
   /* No double-tap zoom, and no rubber-band bounce past the ends: an app's
      pages stay put (pull-to-sync is the app's own, in gestures.js). */
@@ -239,7 +244,11 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
   font-weight: 700; padding: 10px 2px; min-width: 40px;
 }
 .tasks .delete { color: var(--muted); font-weight: 400; margin-left: auto; }
-.tasks .task-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* Tapping the text edits it. iOS only sends a click for a tap on a plain
+   element when it has a pointer cursor. */
+.tasks .task-text { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: pointer; padding: 10px 0; }
+.tasks .edit { flex: 1; min-width: 0; margin: 4px 0; }
+.tasks .edit input { padding: 6px 8px; }
 .tasks .done .check { color: var(--muted); font-weight: 400; }
 .tasks .done .task-text { color: var(--muted); text-decoration: line-through; }
 
