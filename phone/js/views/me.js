@@ -55,7 +55,10 @@ export function render(ctx) {
       <div class="chips">${THEMES.map((choice) => `<button type="button" class="chip${choice === theme ? " on" : ""}" ${action("me-theme", { value: choice })}>${choice}</button>`).join("")}</div>
       <p class="hint">shared with the desktop; auto follows the phone's light and dark mode</p>
       ${heading("accent")}
-      <div class="chips">${Object.keys(PRESETS).map((choice) => `<button type="button" class="chip${choice === accent ? " on" : ""}" ${action("me-accent", { value: choice })}><span class="swatch" style="background:${swatch(choice)}"></span>${choice}</button>`).join("")}</div>
+      <label class="select-row"><span class="swatch" style="background:${swatch(accent)}"></span>
+        <select data-input="me-accent" aria-label="accent colour">${Object.keys(PRESETS).map((choice) => `<option value="${choice}"${choice === accent ? " selected" : ""}>${choice}</option>`).join("")}</select>
+        <span class="caret" aria-hidden="true">▾</span>
+      </label>
       <p class="hint">shared with the desktop; errors stay orange-red</p>`,
   };
 }
@@ -87,9 +90,6 @@ export const actions = {
   "me-theme"(ctx, { value }) {
     ctx.data.saveSetting("theme", value);
   },
-  "me-accent"(ctx, { value }) {
-    ctx.data.saveSetting("accent", value);
-  },
   async "me-push-on"(ctx) {
     showPushError(null);
     try {
@@ -112,6 +112,13 @@ export const actions = {
     } catch (error) {
       showPushError(error);
     }
+  },
+};
+
+// The accent menu saves as soon as a colour is picked.
+export const inputs = {
+  "me-accent"(ctx, field) {
+    ctx.data.saveSetting("accent", field.value);
   },
 };
 

@@ -77,6 +77,10 @@ export class Cloud {
       if (response.status === 401 || ([400, 403].includes(response.status) && path.includes("/auth/"))) {
         throw new AuthError(message);
       }
+      // The push functions and their table come from a one-time setup.
+      if (response.status === 404 && (path.startsWith("/functions/") || path.includes("push_subscriptions"))) {
+        throw new CloudError("notifications aren't set up on the server yet (phone/README.md, steps 1 to 4)");
+      }
       throw new CloudError(message);
     }
     return data;

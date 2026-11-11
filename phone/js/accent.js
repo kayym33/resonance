@@ -22,7 +22,8 @@ export const PRESETS = {
   },
 };
 export const DEFAULT = "orange";
-export const SPECK_SHARE = 0.25;
+// Higher than the desktop's: the phone's noise is short and small.
+export const SPECK_SHARE = 0.4;
 // White stripes vanish on bone, so the day theme uses this grey.
 const DAY_WHITE = "#9A9B90";
 const WHITES = new Set(["#FFFFFF", "#F2EFE8"]);
@@ -40,9 +41,7 @@ export function speckColors(name, night) {
 // A small square for pickers: the flag's stripes, or the colour.
 export function swatch(name) {
   const chosen = preset(name);
-  if (!chosen.stripes) return chosen.mark[0];
-  const step = 100 / chosen.stripes.length;
-  return `linear-gradient(${chosen.stripes.map((stripe, index) => `${stripe} ${index * step}% ${(index + 1) * step}%`).join(", ")})`;
+  return chosen.stripes ? bands(chosen.stripes, "to bottom") : chosen.mark[0];
 }
 
 // Sets the CSS colours for the accent in the current theme.
@@ -51,4 +50,10 @@ export function applyAccent(name, night) {
   const root = document.documentElement.style;
   root.setProperty("--accent", chosen.mark[night ? 1 : 0]);
   root.setProperty("--accent-text", chosen.text[night ? 1 : 0]);
+  root.setProperty("--accent-bar", chosen.stripes ? bands(chosen.stripes, "to right") : chosen.mark[night ? 1 : 0]);
+}
+
+function bands(stripes, direction) {
+  const step = 100 / stripes.length;
+  return `linear-gradient(${direction}, ${stripes.map((stripe, index) => `${stripe} ${index * step}% ${(index + 1) * step}%`).join(", ")})`;
 }
