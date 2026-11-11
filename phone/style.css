@@ -126,6 +126,7 @@ header {
 
 .trail a { text-decoration: none; color: var(--muted); }
 .trail .home { color: var(--ink); font-weight: 700; }
+.trail .home .one { color: var(--accent-text); }
 .trail .slash { color: var(--muted); margin: 0 0.4em; }
 
 .status { color: var(--warning); font-weight: 700; min-width: 1ch; }
@@ -209,6 +210,12 @@ input, select, textarea {
   appearance: none;
 }
 input::placeholder, textarea::placeholder { color: var(--muted); }
+select { min-height: 44px; }
+.select-row { display: flex; align-items: center; gap: 10px; position: relative; }
+/* Fields lose their native look, so the menu draws its own arrow. */
+.select-row .caret { position: absolute; right: 12px; pointer-events: none; color: var(--ink); }
+.select-row .swatch { width: 28px; height: 28px; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18); }
+.select-row select { flex: 1; min-width: 0; padding-right: 34px; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 input[type="date"], input[type="time"] { min-height: 44px; }
 
@@ -253,7 +260,7 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 .tasks .task-text { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: pointer; padding: 10px 0; }
 .tasks .edit { flex: 1; min-width: 0; margin: 4px 0; }
 .tasks .edit input { padding: 6px 8px; }
-.tasks .done .check { color: var(--muted); font-weight: 400; }
+.tasks .done .check { color: var(--accent-text); font-weight: 700; }
 .tasks .done .task-text { color: var(--muted); text-decoration: line-through; }
 
 .events li, .recipes li {
@@ -312,7 +319,9 @@ nav a {
   padding: 14px 0 12px;
   font-size: 14px;
 }
-nav a.on { color: var(--background); background: var(--ink); font-weight: 700; }
+nav a.on { color: var(--background); background: var(--ink); font-weight: 700; position: relative; }
+/* The open tab carries a bar of the accent, or the flag's stripes. */
+nav a.on::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--accent-bar, var(--accent)); }
 
 /* Pull to sync: grows above the page as you pull. */
 .pull {

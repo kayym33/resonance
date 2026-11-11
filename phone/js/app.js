@@ -115,7 +115,8 @@ function entrance(current) {
 }
 
 function crumbHtml(crumbs) {
-  const parts = [`<a href="#/" class="home">t1ld3</a>`];
+  // The "1" wears the accent, so it shows on every page.
+  const parts = [`<a href="#/" class="home">t<span class="one">1</span>ld3</a>`];
   crumbs.forEach((crumb, index) => {
     const [label, href] = Array.isArray(crumb) ? crumb : [crumb, index === 0 ? TAB_ROOTS[crumb] : null];
     const last = index === crumbs.length - 1;
