@@ -11,7 +11,7 @@ from .ascii_art import ThemedImage
 from .backend import REFRESH_TIME, get_time
 from .apps import HubApp, discover
 from .constants import (
-    ACCENT_DARK,
+    WARNING,
     APP_NAME,
     BACKGROUND,
     HOVER,
@@ -21,6 +21,7 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
+from . import accent
 from .battery import Battery, LowBatteryWatch
 from .battery import describe as describe_battery
 from .battery import read_battery
@@ -29,6 +30,7 @@ from .idle_view import IdleView
 from .launcher_panel import LauncherPanel
 from .menu import SIZE_ROW, MenuItem
 from .noise_band import NoiseBand
+from .rich_text import scaled_pad
 from .starfield import Starfield
 from .windows import (
     add_rule,
@@ -125,7 +127,7 @@ class HubWindow(customtkinter.CTkToplevel):
         # packed now so it keeps its place below the pages; the home page
         # fills its own spare space with more, growing denser downwards.
         self.noise_band = NoiseBand(self.content, NOISE_COLUMNS, (0.5, 0.22))
-        self.noise_band.pack(fill="x", pady=(4, 0))
+        self.noise_band.pack(fill="x", pady=scaled_pad(self, (4, 0)))
         Starfield(self.content, 0.22, 0.45, height=56).pack(
             side="bottom",
             fill="x",
@@ -231,14 +233,14 @@ class HubWindow(customtkinter.CTkToplevel):
             self.content,
             corner_radius=0,
             fg_color=BACKGROUND,
-            border_color=ACCENT_DARK,
+            border_color=WARNING,
             border_width=outline_width(self),
         )
         self.battery_warning_label = customtkinter.CTkLabel(
             self.battery_warning,
             text="",
             font=mono(12, "bold"),
-            text_color=ACCENT_DARK,
+            text_color=WARNING,
             height=22,
         )
         self.battery_warning_label.pack(side="left", padx=(12, 4), pady=2)
@@ -380,7 +382,7 @@ class HubWindow(customtkinter.CTkToplevel):
         text, problem = self.app.account_label()
         self.account_button.configure(
             text=text,
-            text_color=ACCENT_DARK if problem else MUTED,
+            text_color=WARNING if problem else MUTED,
         )
         if self.app.sync.session is None:
             self.avatar_label.pack_forget()
@@ -515,6 +517,7 @@ class HubWindow(customtkinter.CTkToplevel):
                     f"Theme: {self.app.theme_choice()}",
                     self.app.cycle_theme,
                 ),
+                MenuItem(f"Accent: {accent.name()}", self.app.cycle_accent),
                 MenuItem("Account", lambda: self.app.open_account(self)),
                 SIZE_ROW,
                 MenuItem("Refresh song", self.app.refresh_song),
@@ -529,7 +532,7 @@ class HubWindow(customtkinter.CTkToplevel):
                     self.toggle_fullscreen,
                 ),
                 MenuItem("Close hub", self.close_window),
-                MenuItem(f"Quit {APP_NAME}", self.app.quit_app, ACCENT_DARK),
+                MenuItem(f"Quit {APP_NAME}", self.app.quit_app, WARNING),
             ],
         )
 
@@ -570,7 +573,7 @@ class HubWindow(customtkinter.CTkToplevel):
         else:
             self.battery_label.configure(
                 text=describe_battery(battery),
-                text_color=ACCENT_DARK if battery.low else MUTED,
+                text_color=WARNING if battery.low else MUTED,
             )
             if self.battery_label.winfo_manager() != "pack":
                 # Packed after the clock, so it sits just left of it.

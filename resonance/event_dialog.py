@@ -6,7 +6,7 @@ from typing import Callable
 import customtkinter
 
 from .constants import (
-    ACCENT_DARK,
+    WARNING,
     BACKGROUND,
     HOVER,
     INK,
@@ -106,7 +106,7 @@ class EventDialog(customtkinter.CTkToplevel):
             body,
             text="",
             font=mono(10),
-            text_color=ACCENT_DARK,
+            text_color=WARNING,
             anchor="w",
             height=16,
         )
@@ -125,7 +125,7 @@ class EventDialog(customtkinter.CTkToplevel):
                 corner_radius=0,
                 fg_color="transparent",
                 hover_color=HOVER,
-                text_color=ACCENT_DARK,
+                text_color=WARNING,
                 font=mono(11, "bold"),
                 command=self.delete,
             ).pack(side="left")

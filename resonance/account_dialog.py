@@ -8,7 +8,7 @@ import customtkinter
 from PIL import Image
 
 from .constants import (
-    ACCENT_DARK,
+    WARNING,
     APP_AUTHOR,
     BACKGROUND,
     HOVER,
@@ -142,10 +142,10 @@ class AccountDialog(customtkinter.CTkToplevel):
         if not email or not password:
             self.error_label.configure(
                 text="enter your email and password",
-                text_color=ACCENT_DARK,
+                text_color=WARNING,
             )
             return
-        self.error_label.configure(text="", text_color=ACCENT_DARK)
+        self.error_label.configure(text="", text_color=WARNING)
         self.sign_in_button.configure(text="signing in...", state="disabled")
         self.app.sync.sign_in(email, password, self.signed_in, self.confirm_switch)
 
@@ -223,7 +223,7 @@ class AccountDialog(customtkinter.CTkToplevel):
         buttons = self.button_row()
         self.button(buttons, "close", self.destroy)
         self.button(buttons, "sync now", self.app.sync.sync_now)
-        self.button(buttons, "sign out", self.sign_out, color=ACCENT_DARK)
+        self.button(buttons, "sign out", self.sign_out, color=WARNING)
 
     def show_avatar(self) -> None:
         large, _icon = self.app.avatar_images()
@@ -248,7 +248,7 @@ class AccountDialog(customtkinter.CTkToplevel):
         except OSError:
             self.error_label.configure(
                 text="couldn't open that image",
-                text_color=ACCENT_DARK,
+                text_color=WARNING,
             )
             return
         self.avatar_changed()
@@ -274,7 +274,7 @@ class AccountDialog(customtkinter.CTkToplevel):
         if len(password) < MIN_PASSWORD_LENGTH:
             self.error_label.configure(
                 text=f"use at least {MIN_PASSWORD_LENGTH} characters",
-                text_color=ACCENT_DARK,
+                text_color=WARNING,
             )
             return
         self.error_label.configure(text="changing password...", text_color=MUTED)
@@ -287,7 +287,7 @@ class AccountDialog(customtkinter.CTkToplevel):
             self.password_entry.delete(0, "end")
             self.error_label.configure(text="password changed", text_color=MUTED)
         else:
-            self.error_label.configure(text=error.lower(), text_color=ACCENT_DARK)
+            self.error_label.configure(text=error.lower(), text_color=WARNING)
 
     def sign_out(self) -> None:
         self.app.sync.sign_out()
@@ -358,7 +358,7 @@ class AccountDialog(customtkinter.CTkToplevel):
             self.body,
             text="",
             font=mono(10),
-            text_color=ACCENT_DARK,
+            text_color=WARNING,
             anchor="w",
             justify="left",
             wraplength=340,

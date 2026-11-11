@@ -1,5 +1,7 @@
 /* t1ld3's look on the phone: bone and ink, monospace, square corners,
-   orange as the only accent. Colours are the desktop's (constants.py). */
+   one accent colour. Colours are the desktop's (constants.py); the accent
+   is the user's choice (js/accent.js sets --accent and --accent-text), and
+   errors keep --warning whatever it is. */
 :root {
   --background: #E7E7DD;
   --ink: #111210;
@@ -11,6 +13,7 @@
   --field: #F0F0E8;
   --accent: #E8642C;
   --accent-text: #B44718;
+  --warning: #B44718;
   --mono: ui-monospace, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
   color-scheme: light;
 }
@@ -25,7 +28,7 @@
     --rule: #33342F;
     --hover: #262722;
     --field: #1B1C19;
-    --accent-text: #F08A5D;
+    --warning: #F08A5D;
     color-scheme: dark;
   }
 }
@@ -39,7 +42,7 @@
   --rule: #33342F;
   --hover: #262722;
   --field: #1B1C19;
-  --accent-text: #F08A5D;
+  --warning: #F08A5D;
   color-scheme: dark;
 }
 
@@ -125,7 +128,7 @@ header {
 .trail .home { color: var(--ink); font-weight: 700; }
 .trail .slash { color: var(--muted); margin: 0 0.4em; }
 
-.status { color: var(--accent-text); font-weight: 700; min-width: 1ch; }
+.status { color: var(--warning); font-weight: 700; min-width: 1ch; }
 
 main { padding: 16px 16px 24px; }
 
@@ -148,7 +151,7 @@ p { margin: 8px 0; }
 .hint { color: var(--muted); font-size: 12px; font-style: italic; }
 .label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .center { text-align: center; }
-.error { color: var(--accent-text); }
+.error { color: var(--warning); }
 .flash { border-left: 3px solid var(--accent); padding-left: 10px; color: var(--ink); }
 .art { color: var(--muted); margin: 16px 0; font: inherit; }
 .art.center { display: table; margin: 40px auto 8px; }
@@ -187,6 +190,7 @@ code { font: inherit; color: var(--ink); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { border-color: var(--rule); color: var(--ink-soft); font-weight: 400; min-height: 36px; padding: 5px 12px; }
 .chip.on { background: var(--ink); border-color: var(--ink); color: var(--background); }
+.chip .swatch { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18); }
 
 .picker { display: flex; align-items: center; gap: 4px; }
 .picker .muted { margin-right: 6px; }

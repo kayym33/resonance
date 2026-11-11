@@ -7,8 +7,8 @@ from datetime import date, datetime, time, timedelta
 
 import customtkinter
 
+from . import accent
 from .constants import (
-    ACCENT,
     BACKGROUND,
     FAINT,
     HOVER,
@@ -134,6 +134,7 @@ class CalendarPage(customtkinter.CTkFrame):
         self.set_view(self.view)
         self.after(60_000, self.tick)
         watch(self.retheme)
+        accent.watch(self.retheme)
 
     def retheme(self) -> None:
         for widget in (self.header_canvas, self.body, self.grid_canvas):
@@ -380,7 +381,7 @@ class CalendarPage(customtkinter.CTkFrame):
                 y,
                 x + column,
                 y,
-                fill=color(ACCENT),
+                fill=color(accent.mark()),
                 width=max(1, round(2 * s)),
             )
             dot = 3 * s
@@ -389,7 +390,7 @@ class CalendarPage(customtkinter.CTkFrame):
                 y - dot,
                 x + dot,
                 y + dot,
-                fill=color(ACCENT),
+                fill=color(accent.mark()),
                 outline="",
             )
 
@@ -643,6 +644,7 @@ class CalendarPage(customtkinter.CTkFrame):
 
     def destroy(self) -> None:
         unwatch(self.retheme)
+        accent.unwatch(self.retheme)
         cancel_pending_after(self)
         super().destroy()
 

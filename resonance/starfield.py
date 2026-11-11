@@ -6,9 +6,10 @@ import tkinter.font as tkfont
 
 import customtkinter
 
+from . import accent
 from .ascii_art import NOISE_MARKS, blend_rgb, hex_to_rgb
 from .constants import BACKGROUND, FAINT, MONO_FONT
-from .theme import color, unwatch, watch
+from .theme import color, is_night, unwatch, watch
 from .windows import cancel_pending_after
 
 TWINKLE_MS = 200
@@ -63,6 +64,7 @@ class Starfield(tk.Canvas):
         self.bind("<Configure>", lambda _event: self.fill())
         self.after(TWINKLE_MS, self.twinkle)
         watch(self.retheme)
+        accent.watch(self.retheme)
 
     def retheme(self) -> None:
         self.configure(bg=color(BACKGROUND))
@@ -95,7 +97,8 @@ class Starfield(tk.Canvas):
             (column + 0.5) * CELL_WIDTH * scaling,
             (row + 0.5) * CELL_HEIGHT * scaling,
             text=self.rng.choice(NOISE_MARKS),
-            fill=self.rng.choice(self.colors),
+            # A share of the stars are specks of the accent colour.
+            fill=accent.speck(self.rng, is_night()) or self.rng.choice(self.colors),
             font=self.font,
         )
 
@@ -110,5 +113,6 @@ class Starfield(tk.Canvas):
 
     def destroy(self) -> None:
         unwatch(self.retheme)
+        accent.unwatch(self.retheme)
         cancel_pending_after(self)
         super().destroy()

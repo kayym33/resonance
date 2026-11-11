@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING, Callable
 
 import customtkinter
 
+from . import accent
 from .constants import (
-    ACCENT_DARK,
+    WARNING,
     BACKGROUND,
     HOVER,
     INK,
@@ -187,6 +188,7 @@ class CookbookPage(customtkinter.CTkFrame):
         self.rich_texts.append(self.timer_text)
 
         RECIPES.listeners.append(self.recipes_changed)
+        accent.watch(self.recolor_star)
         # Cooking mode's keys, bound on the hub (never bind_all). They
         # only act while cooking and when no text field has focus.
         hub = self.winfo_toplevel()
@@ -276,7 +278,7 @@ class CookbookPage(customtkinter.CTkFrame):
             return
         text, error = self.message or ("", False)
         self.message = None
-        label.configure(text=text, text_color=ACCENT_DARK if error else MUTED)
+        label.configure(text=text, text_color=WARNING if error else MUTED)
 
     # Shared widgets
 
@@ -614,6 +616,11 @@ class CookbookPage(customtkinter.CTkFrame):
             side="left", fill="both", expand=True, padx=scaled_pad(self, (28, 0))
         )
 
+    def recolor_star(self) -> None:
+        recipe = self.current_recipe()
+        if recipe is not None and recipe.favourite:
+            self.star_button.configure(text_color=accent.text())
+
     def current_recipe(self) -> Recipe | None:
         return get_recipe(self.recipe_id) if self.recipe_id else None
 
@@ -628,7 +635,7 @@ class CookbookPage(customtkinter.CTkFrame):
         self.recipe_title.configure(text=recipe.title)
         self.star_button.configure(
             text="★" if recipe.favourite else "☆",
-            text_color=ACCENT_DARK if recipe.favourite else MUTED,
+            text_color=accent.text() if recipe.favourite else MUTED,
         )
         self.recipe_servings.set(self.servings)
         meta = [recipe.summary(), cooked_label(recipe.last_cooked, date.today())]
@@ -976,7 +983,7 @@ class CookbookPage(customtkinter.CTkFrame):
             bottom,
             text="",
             font=mono(11),
-            text_color=ACCENT_DARK,
+            text_color=WARNING,
             anchor="w",
         )
         self.error_label.pack(side="left")
@@ -986,7 +993,7 @@ class CookbookPage(customtkinter.CTkFrame):
             bottom,
             "delete",
             self.delete_editing,
-            text_color=ACCENT_DARK,
+            text_color=WARNING,
             pack=False,
         )
 
@@ -1163,5 +1170,6 @@ class CookbookPage(customtkinter.CTkFrame):
     def destroy(self) -> None:
         if self.recipes_changed in RECIPES.listeners:
             RECIPES.listeners.remove(self.recipes_changed)
+        accent.unwatch(self.recolor_star)
         cancel_pending_after(self)
         super().destroy()

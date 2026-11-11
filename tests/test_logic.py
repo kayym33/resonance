@@ -9,6 +9,8 @@ modules are imported, so nothing here reads or writes real data.
 from __future__ import annotations
 
 import os
+import random
+import re
 import sys
 import tempfile
 import unittest
@@ -20,6 +22,7 @@ os.environ["LOCALAPPDATA"] = DATA_ROOT
 os.environ["HOME"] = DATA_ROOT
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from resonance import accent  # noqa: E402
 from resonance.battery import Battery, LowBatteryWatch  # noqa: E402
 from resonance.launcher import Command, suggest  # noqa: E402
 from resonance.store import Collection  # noqa: E402
@@ -166,6 +169,87 @@ class LowBatteryTests(unittest.TestCase):
         self.assertFalse(LowBatteryWatch.still_low(Battery(26, False)))
         self.assertFalse(LowBatteryWatch.still_low(Battery(10, True)))
         self.assertFalse(LowBatteryWatch.still_low(None))
+
+
+def luminance(hex_color: str) -> float:
+    channels = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    channels = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+
+def contrast(a: str, b: str) -> float:
+    light, dark = sorted((luminance(a), luminance(b)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
+
+
+class AccentTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        accent.set_accent(accent.DEFAULT)
+
+    def test_unknown_choice_means_orange(self) -> None:
+        accent.set_accent("trans")
+        self.assertTrue(accent.set_accent("neon"))
+        self.assertEqual(accent.name(), "orange")
+        self.assertFalse(accent.set_accent(None))
+
+    def test_change_notifies_once(self) -> None:
+        calls: list[str] = []
+        listener = lambda: calls.append(accent.name())  # noqa: E731
+        accent.watch(listener)
+        try:
+            accent.set_accent("moss")
+            accent.set_accent("moss")
+        finally:
+            accent.unwatch(listener)
+        self.assertEqual(calls, ["moss"])
+
+    def test_text_as_readable_as_the_old_orange(self) -> None:
+        orange = accent.PRESETS["orange"].text
+        day_floor = contrast(orange[0], "#E7E7DD")
+        night_floor = contrast(orange[1], "#121311")
+        for name, preset in accent.PRESETS.items():
+            with self.subTest(name=name):
+                self.assertGreaterEqual(contrast(preset.text[0], "#E7E7DD"), day_floor)
+                self.assertGreaterEqual(contrast(preset.text[1], "#121311"), night_floor - 0.5)
+
+    def test_flag_spreads_over_the_figure(self) -> None:
+        accent.set_accent("lesbian")
+        self.assertEqual(accent.figure_rows(7, False), list(accent.PRESETS["lesbian"].stripes))
+        accent.set_accent("trans")
+        rows = accent.figure_rows(7, False)
+        self.assertEqual(rows[0], rows[-1])
+        self.assertIn("#F2EFE8", rows)
+        accent.set_accent("slate")
+        self.assertEqual(set(accent.figure_rows(7, True)), {"#7193B4"})
+
+    def test_white_stripe_is_grey_by_day(self) -> None:
+        accent.set_accent("trans")
+        self.assertIn(accent.DAY_WHITE, accent.speck_colors(False))
+        self.assertIn("#F2EFE8", accent.speck_colors(True))
+
+    def test_speck_share(self) -> None:
+        rng = random.Random(1)
+        specks = sum(accent.speck(rng, False) is not None for _ in range(10_000))
+        self.assertAlmostEqual(specks / 10_000, accent.SPECK_SHARE, delta=0.02)
+
+    def test_phone_has_the_same_presets(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "phone" / "js" / "accent.js").read_text(encoding="utf-8")
+        block = source[source.index("PRESETS = {"):source.index("};", source.index("PRESETS = {"))]
+        phone: dict[str, list[str]] = {}
+        for match in re.finditer(r"^  (\w+): \{(.*?)\},?$", block, re.M | re.S):
+            phone[match.group(1)] = re.findall(r"#[0-9A-F]{6}", match.group(2))
+        desktop = {
+            name: [*preset.mark, *preset.text, *preset.stripes]
+            for name, preset in accent.PRESETS.items()
+        }
+        self.assertEqual(phone, desktop)
+
+    def test_launcher_lists_presets(self) -> None:
+        names = [item.args for item in suggest("accent ", COMMANDS)]
+        self.assertEqual(names, list(accent.PRESETS))
+        result = suggest("accent tr", COMMANDS)
+        self.assertEqual([(item.kind, item.args) for item in result], [("accent", "trans")])
+        self.assertEqual(suggest("accent zzz", COMMANDS)[0].kind, "none")
 
 
 if __name__ == "__main__":

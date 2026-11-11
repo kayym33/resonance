@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import customtkinter
 
 from .constants import (
-    ACCENT_DARK,
+    WARNING,
     BACKGROUND,
     HOVER,
     INK,
@@ -173,7 +173,7 @@ class WeatherPanel(customtkinter.CTkFrame):
                 self.body,
                 text=error,
                 font=mono(10),
-                text_color=ACCENT_DARK,
+                text_color=WARNING,
                 anchor="w",
             ).pack(fill="x", pady=(4, 0))
 

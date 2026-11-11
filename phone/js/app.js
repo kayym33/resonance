@@ -2,6 +2,7 @@
 // (header trail, tab bar, timer strip). Views live in views/; each returns
 // {crumbs, html} and lists its actions, forms, inputs and swipes, which
 // the handlers here dispatch to by name (data-action="todo-toggle").
+import { applyAccent, SPECK_SHARE, speckColors } from "./accent.js";
 import { Cloud } from "./cloud.js";
 import { Data } from "./data.js";
 import { installGestures } from "./gestures.js";
@@ -208,11 +209,22 @@ function applyTheme() {
   else delete root.dataset.theme;
   const night = theme === "night" || (theme !== "day" && matchMedia("(prefers-color-scheme: dark)").matches);
   document.querySelector('meta[name="theme-color"]').content = night ? "#121311" : "#E7E7DD";
+  const accent = data.setting("accent");
+  applyAccent(accent, night);
+  fillNoise(speckColors(accent, night));
 }
 
-function fillNoise() {
-  const row = () => Array.from({ length: 120 }, () => (Math.random() < 0.18 ? NOISE[1 + Math.floor(Math.random() * (NOISE.length - 1))] : " ")).join("");
-  document.querySelector(".noise").textContent = `${row()}\n${row()}`;
+// Two rows of faint marks; a share are specks of the accent (or a flag).
+function fillNoise(specks) {
+  const mark = () => NOISE[1 + Math.floor(Math.random() * (NOISE.length - 1))];
+  const glyph = () => {
+    if (Math.random() >= 0.18) return " ";
+    if (Math.random() >= SPECK_SHARE) return esc(mark());
+    const speck = specks[Math.floor(Math.random() * specks.length)];
+    return `<b style="color:${speck}">${esc(mark())}</b>`;
+  };
+  const row = () => Array.from({ length: 120 }, glyph).join("");
+  document.querySelector(".noise").innerHTML = `${row()}\n${row()}`;
 }
 
 // Taps, forms, typing and swipes all dispatch by name.
@@ -350,7 +362,6 @@ setInterval(() => {
 // makes the page jump.
 history.scrollRestoration = "manual";
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
-fillNoise();
 applyTheme();
 render();
 if (cloud.signedIn) sync.syncNow();

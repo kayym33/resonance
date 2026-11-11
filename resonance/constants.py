@@ -35,13 +35,10 @@ MUTED = ("#6B6C63", "#8F9086")
 FAINT = ("#A6A79B", "#4D4E47")
 RULE = ("#CBCBBF", "#33342F")
 HOVER = ("#D8D8CD", "#262722")
-ACCENT = ("#E8642C", "#E8642C")
-# Orange text and outlines; lighter at night so it stays readable.
-ACCENT_DARK = ("#B44718", "#F08A5D")
+# Errors and warnings: orange-red whatever the accent (accent.py) is, and
+# lighter at night so it stays readable.
+WARNING = ("#B44718", "#F08A5D")
 FIELD = ("#F0F0E8", "#1B1C19")
-# The pixel figure in the album art keeps its colours in both themes.
-FIGURE_COLOR = "#E8642C"
-FIGURE_SHADE = "#B44718"
 ALBUM_ART_SIZE = 168
 MONO_FONT = "Consolas" if os.name == "nt" else "DejaVu Sans Mono"
 # Hub pages: the side margin and the gap between sections.

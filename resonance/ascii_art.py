@@ -6,11 +6,10 @@ from typing import Any, Callable
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from . import accent
 from .constants import (
     ALBUM_ART_SIZE,
     BACKGROUND,
-    FIGURE_COLOR,
-    FIGURE_SHADE,
     INK,
     MUTED,
 )
@@ -107,7 +106,12 @@ def draw_figure(
         (left - pixel, top - pixel, left + width + pixel, bottom + pixel),
         fill=pick(BACKGROUND, night),
     )
+    # The accent, or a flag with one stripe per band of rows.
+    colors = accent.figure_rows(len(rows), night)
     for row_index, row in enumerate(rows):
+        fill = hex_to_rgb(colors[row_index])
+        # A white stripe gets a hairline by day, or it vanishes into bone.
+        edge = hex_to_rgb(pick(MUTED, night)) if not night and colors[row_index] in accent.WHITES else None
         for column_index, cell in enumerate(row):
             if cell == ".":
                 continue
@@ -115,7 +119,9 @@ def draw_figure(
             y = top + row_index * pixel
             draw.rectangle(
                 (x, y, x + pixel - 1, y + pixel - 1),
-                fill=FIGURE_SHADE if cell == "O" else FIGURE_COLOR,
+                # "O" marks the shaded shoulders.
+                fill=blend_rgb(fill, (0, 0, 0), 0.22) if cell == "O" else fill,
+                outline=edge,
             )
 
 
@@ -131,11 +137,14 @@ def render_ascii_art(
     """Redraw an image as dithered glyph noise on bone paper.
 
     ``cell`` is the pixel size of one glyph; ``figure`` adds the little
-    orange figure standing in the scene. At ``night`` the glyphs are
-    light on dark paper, and a ``photo`` maps brightness (not darkness)
-    to dense glyphs so it doesn't come out as a negative.
+    figure standing in the scene, in the accent colour, and colours a share
+    of the glyphs with it ("specks"). At ``night`` the glyphs are light on
+    dark paper, and a ``photo`` maps brightness (not darkness) to dense
+    glyphs so it doesn't come out as a negative.
     """
     rng = random.Random(seed)
+    # Separate, so the specks don't change the picture's own randomness.
+    speck_rng = random.Random(f"{seed}-specks")
     cell_width, cell_height = cell
     columns, rows = size // cell_width, size // cell_height
     if source is None:
@@ -175,6 +184,10 @@ def render_ascii_art(
             if glyph == " ":
                 continue
             color = blend_rgb(muted, ink, index / last_glyph)
+            if figure:
+                speck = accent.speck(speck_rng, night, accent.ART_SPECK_SHARE)
+                if speck is not None:
+                    color = hex_to_rgb(speck)
             draw.text(
                 (x * cell_width, y * cell_height - 1),
                 glyph,

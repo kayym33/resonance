@@ -49,7 +49,7 @@ from .settings import (
     save_device_setting,
     save_setting,
 )
-from . import theme
+from . import accent, theme
 from .sync import SyncEngine
 from .toast import Toast
 from .user_profile import avatar_source, display_name, profile_data
@@ -89,6 +89,10 @@ class ResonanceApp(customtkinter.CTk):
         self.song: dict[str, Any] | None = None
         self.song_request_active: bool = False
         self.album_art_url: str | None = None
+        # The downloaded cover, kept so a new accent can redraw it.
+        self.album_art_source: Image.Image | None = None
+        # Before any art is drawn, since the figure wears the accent.
+        accent.set_accent(load_settings().get("accent"))
         self.album_art_image: ThemedImage = both_themes(render_ascii_art, None)
         self.hub: HubWindow | None = None
         self.player: PlayerWindow | None = None
@@ -237,6 +241,33 @@ class ResonanceApp(customtkinter.CTk):
         self.update_theme()
         return choice
 
+    # Accent colour
+
+    def set_accent_choice(self, choice: str) -> None:
+        save_setting("accent", choice)
+        self.update_accent()
+
+    def cycle_accent(self) -> str:
+        """Step to the next accent preset; returns its name."""
+        names = list(accent.PRESETS)
+        choice = names[(names.index(accent.name()) + 1) % len(names)]
+        self.set_accent_choice(choice)
+        return choice
+
+    def update_accent(self) -> None:
+        if accent.set_accent(load_settings().get("accent")):
+            self.redraw_album_art()
+
+    def redraw_album_art(self) -> None:
+        """Draw the current cover again, for the figure and specks."""
+        source, image_url = self.album_art_source, self.album_art_url
+        future: Future[tuple[Image.Image | None, ThemedImage]] = self.worker.submit(
+            lambda: (source, both_themes(render_ascii_art, source, seed=image_url))
+        )
+        future.add_done_callback(
+            lambda completed: self.album_art_request_finished(completed, image_url)
+        )
+
     def is_dark_outside(self) -> bool:
         """Night between sunset and sunrise where the weather is for, or
         7pm to 7am when there's no forecast yet."""
@@ -322,6 +353,7 @@ class ResonanceApp(customtkinter.CTk):
         """Synced data changed underneath the UI; refresh what shows it."""
         if "setting" in kinds:
             self.update_theme()
+            self.update_accent()
         if self.hub is not None:
             self.hub.data_changed(kinds)
         if "profile" in kinds:
@@ -505,10 +537,11 @@ class ResonanceApp(customtkinter.CTk):
     def load_album_art(self, image_url: str | None) -> None:
         self.album_art_url = image_url
         if not image_url:
+            self.album_art_source = None
             self.show_album_art(both_themes(render_ascii_art, None))
             return
 
-        future: Future[ThemedImage] = self.worker.submit(
+        future: Future[tuple[Image.Image | None, ThemedImage]] = self.worker.submit(
             self.download_album_art,
             image_url,
         )
@@ -519,29 +552,30 @@ class ResonanceApp(customtkinter.CTk):
         )
 
     @staticmethod
-    def download_album_art(image_url: str) -> ThemedImage:
+    def download_album_art(image_url: str) -> tuple[Image.Image | None, ThemedImage]:
         with urlopen(image_url, timeout=5) as response:
             image = Image.open(BytesIO(response.read())).convert("RGB")
-        return both_themes(render_ascii_art, image, seed=image_url)
+        return image, both_themes(render_ascii_art, image, seed=image_url)
 
     def album_art_request_finished(
         self,
-        future: Future[ThemedImage],
-        requested_url: str,
+        future: Future[tuple[Image.Image | None, ThemedImage]],
+        requested_url: str | None,
     ) -> None:
         self.after(0, self.apply_album_art, future, requested_url)
 
     def apply_album_art(
         self,
-        future: Future[ThemedImage],
-        requested_url: str,
+        future: Future[tuple[Image.Image | None, ThemedImage]],
+        requested_url: str | None,
     ) -> None:
         if requested_url != self.album_art_url:
             return
 
         try:
-            images = future.result()
+            self.album_art_source, images = future.result()
         except Exception:
+            self.album_art_source = None
             images = both_themes(render_ascii_art, None)
         self.show_album_art(images)
 

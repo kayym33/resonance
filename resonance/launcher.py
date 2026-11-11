@@ -16,6 +16,7 @@ from urllib.parse import quote_plus
 from .constants import APP_NAME
 from .paths import DATA_DIR
 from .store import parse_iso
+from .accent import PRESETS as ACCENT_PRESETS
 from .usage import Usage, frecency
 
 COMMANDS_PATH = DATA_DIR / "commands.json"
@@ -89,6 +90,7 @@ BUILTINS: dict[str, str] = {
     "home": "back to the home page",
     "account": "sign in or manage your account",
     "theme": "switch between auto, night and day",
+    "accent": "change the accent colour",
     "fullscreen": "toggle full screen (F11)",
     "quit": f"quit {APP_NAME}",
 }
@@ -113,8 +115,8 @@ class Suggestion:
     ``kind`` is "run" (start ``command`` with ``args``), "builtin" (app
     action named by ``args``), "page" (open the hub app named ``args``),
     "play" (Spotify search for ``args``), "todo" (add ``args`` as a task),
-    "phone" (push ``args`` to the phone app) or "calc" (``args`` is the
-    result).
+    "phone" (push ``args`` to the phone app), "accent" (switch to the
+    preset named ``args``) or "calc" (``args`` is the result).
     """
 
     title: str
@@ -300,6 +302,8 @@ def suggest(
                     args,
                 )
             ]
+        if word == "accent":
+            return accent_suggestions(text, args)
         for command in commands:
             if word in command.names():
                 return argument_suggestions(command, word, args)
@@ -372,6 +376,18 @@ def suggest(
             )
         )
     return suggestions[:MAX_SUGGESTIONS]
+
+
+def accent_suggestions(text: str, args: str) -> list[Suggestion]:
+    """The accent presets starting with ``args``, or all of them."""
+    needle = args.lower()
+    names = [name for name in ACCENT_PRESETS if name.startswith(needle)]
+    if not names:
+        return [Suggestion(text.strip(), "no such colour", text, "none")]
+    return [
+        Suggestion(f"accent {name}", "accent colour", f"accent {name}", "accent", name)
+        for name in names
+    ]
 
 
 def argument_suggestions(
