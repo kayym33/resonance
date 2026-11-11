@@ -27,6 +27,7 @@ from .launcher import (
     suggest,
 )
 from .todo import add_task
+from .usage import load_usage, record_use
 from .windows import add_rule, cancel_pending_after, outline_width
 
 if TYPE_CHECKING:
@@ -180,7 +181,12 @@ class LauncherPanel(customtkinter.CTkFrame):
             if hub is not None
             else {}
         )
-        self.suggestions = suggest(self.entry.get(), self.commands, pages)
+        self.suggestions = suggest(
+            self.entry.get(),
+            self.commands,
+            pages,
+            usage=load_usage(),
+        )
         self.selected = 0
         self.render_suggestions()
 
@@ -253,11 +259,19 @@ class LauncherPanel(customtkinter.CTkFrame):
                 self.show_status(run_command(suggestion.command, suggestion.args))
             except OSError as error:
                 self.show_status(str(error), error=True)
-        elif suggestion.kind == "calc":
+            else:
+                record_use(suggestion.command.name)
+            return
+        if suggestion.kind == "calc":
             self.clipboard_clear()
             self.clipboard_append(suggestion.args)
             self.show_status(f"copied {suggestion.args}")
-        elif suggestion.kind == "play":
+            return
+
+        # Everything left is a built-in or a hub app, counted under its name.
+        named = suggestion.kind in ("builtin", "page")
+        record_use(suggestion.args if named else suggestion.kind)
+        if suggestion.kind == "play":
             self.show_status(f"searching Spotify for {suggestion.args}...")
             future: Future[str] = self.app.worker.submit(
                 play_search,

@@ -10,12 +10,13 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from urllib.parse import quote_plus
 
 from .constants import APP_NAME
 from .paths import DATA_DIR
 from .store import parse_iso
+from .usage import Usage, frecency
 
 COMMANDS_PATH = DATA_DIR / "commands.json"
 # Commands sync per platform, since program names and paths differ.
@@ -245,9 +246,16 @@ def suggest(
     text: str,
     commands: list[Command],
     pages: dict[str, str] | None = None,
+    usage: Mapping[str, Usage] | None = None,
+    now: datetime | None = None,
 ) -> list[Suggestion]:
-    """Rank what ``text`` could mean. ``pages`` maps the hub's app names
-    to their descriptions."""
+    """Suggestions for the typed text, best first.
+
+    ``pages`` maps the hub's app names to their descriptions. How well the
+    text matches always comes first. ``usage`` (from ``usage.load_usage``)
+    only orders suggestions that match equally well, putting the ones run
+    most often and most recently on top.
+    """
     stripped = text.strip()
     if not stripped:
         return []
@@ -296,13 +304,17 @@ def suggest(
             if word in command.names():
                 return argument_suggestions(command, word, args)
 
-    ranked: list[tuple[int, int, Suggestion]] = []
+    usage = usage or {}
+    now = now or datetime.now(timezone.utc)
+    # Sorted by match quality, then usage, then the order they're listed in.
+    ranked: list[tuple[int, float, int, Suggestion]] = []
     for index, command in enumerate(commands):
         rank = match_rank(stripped.lower(), command.names(), command.description)
         if rank is not None:
             ranked.append(
                 (
                     rank,
+                    -frecency(usage.get(command.name), now),
                     index,
                     Suggestion(
                         command.name,
@@ -319,6 +331,7 @@ def suggest(
             ranked.append(
                 (
                     rank,
+                    -frecency(usage.get(name), now),
                     len(commands) + index,
                     Suggestion(
                         name,
@@ -338,11 +351,13 @@ def suggest(
             ranked.append(
                 (
                     rank,
+                    -frecency(usage.get(name), now),
                     len(commands) + len(BUILTINS) + index,
                     Suggestion(name, detail, f"{name} ", "page", name),
                 )
             )
-    suggestions = [suggestion for *_, suggestion in sorted(ranked)]
+    ranked.sort(key=lambda entry: entry[:3])
+    suggestions = [entry[3] for entry in ranked]
 
     search = next((command for command in commands if command.name == "g"), None)
     if search is not None:
