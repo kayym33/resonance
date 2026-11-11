@@ -1,4 +1,5 @@
 // Account, sync, notifications and theme; and the sign-in screen.
+import { DEFAULT, PRESETS, swatch } from "../accent.js";
 import { disablePush, enablePush, isStandalone, pushStatus } from "../push.js";
 import { action, button, esc, heading } from "../ui.js";
 
@@ -39,6 +40,7 @@ function notificationPart() {
 
 export function render(ctx) {
   const theme = ctx.data.setting("theme") ?? "auto";
+  const accent = ctx.data.setting("accent") ?? DEFAULT;
   return {
     crumbs: ["me"],
     html: `
@@ -51,7 +53,10 @@ export function render(ctx) {
       <p class="error" data-part="push-error" hidden></p>
       ${heading("theme")}
       <div class="chips">${THEMES.map((choice) => `<button type="button" class="chip${choice === theme ? " on" : ""}" ${action("me-theme", { value: choice })}>${choice}</button>`).join("")}</div>
-      <p class="hint">shared with the desktop; auto follows the phone's light and dark mode</p>`,
+      <p class="hint">shared with the desktop; auto follows the phone's light and dark mode</p>
+      ${heading("accent")}
+      <div class="chips">${Object.keys(PRESETS).map((choice) => `<button type="button" class="chip${choice === accent ? " on" : ""}" ${action("me-accent", { value: choice })}><span class="swatch" style="background:${swatch(choice)}"></span>${choice}</button>`).join("")}</div>
+      <p class="hint">shared with the desktop; errors stay orange-red</p>`,
   };
 }
 
@@ -81,6 +86,9 @@ export const actions = {
   },
   "me-theme"(ctx, { value }) {
     ctx.data.saveSetting("theme", value);
+  },
+  "me-accent"(ctx, { value }) {
+    ctx.data.saveSetting("accent", value);
   },
   async "me-push-on"(ctx) {
     showPushError(null);

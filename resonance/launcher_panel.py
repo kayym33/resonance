@@ -8,7 +8,7 @@ import customtkinter
 
 from .backend import play_search
 from .constants import (
-    ACCENT_DARK,
+    WARNING,
     APP_NAME,
     BACKGROUND,
     INK,
@@ -296,6 +296,11 @@ class LauncherPanel(customtkinter.CTkFrame):
             self.app.hub.show_page("calendar" if suggestion.args == "cal" else "home")
         elif suggestion.args == "account" and self.app.hub is not None:
             self.app.open_account(self.app.hub)
+        elif suggestion.kind == "accent":
+            self.app.set_accent_choice(suggestion.args)
+            self.show_status(f"accent: {suggestion.args}")
+        elif suggestion.args == "accent":
+            self.show_status(f"accent: {self.app.cycle_accent()}")
         elif suggestion.args == "theme":
             self.show_status(f"theme: {self.app.cycle_theme()}")
         elif suggestion.args == "fullscreen" and self.app.hub is not None:
@@ -330,7 +335,7 @@ class LauncherPanel(customtkinter.CTkFrame):
     def show_status(self, text: str, error: bool = False) -> None:
         self.status_label.configure(
             text=text,
-            text_color=ACCENT_DARK if error else MUTED,
+            text_color=WARNING if error else MUTED,
         )
         if self.status_id is not None:
             self.after_cancel(self.status_id)

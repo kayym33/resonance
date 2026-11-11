@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import customtkinter
 
-from .constants import ACCENT, BACKGROUND, INK, INK_SOFT, MONO_FONT, MUTED
+from . import accent
+from .constants import BACKGROUND, INK, INK_SOFT, MONO_FONT, MUTED
 from .windows import cancel_pending_after, outline_width
 
 TOAST_WIDTH = 320
@@ -57,7 +58,7 @@ class Toast(customtkinter.CTkToplevel):
             header,
             text="■",
             font=mono(10),
-            text_color=ACCENT,
+            text_color=accent.mark(),
             height=16,
         ).pack(side="left", padx=(0, 6))
         customtkinter.CTkLabel(

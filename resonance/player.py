@@ -14,9 +14,9 @@ from .backend import (
     seek_playback,
     set_volume,
 )
+from . import accent
 from .constants import (
-    ACCENT,
-    ACCENT_DARK,
+    WARNING,
     ALBUM_ART_SIZE,
     APP_NAME,
     APP_SIZES,
@@ -33,6 +33,7 @@ from .constants import (
 from .menu import SIZE_ROW, MenuItem
 from .theme import color
 from .noise_band import NoiseBand
+from .rich_text import scaled_pad
 from .user_profile import display_name
 from .windows import cancel_pending_after, outline_width, prepare_window
 
@@ -80,7 +81,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.loading_started_at: float = time.monotonic()
         self.quote_index: int = 0
 
-        NoiseBand(self, 90, (0.5, 0.26)).pack(fill="x", pady=(6, 0))
+        NoiseBand(self, 90, (0.5, 0.26)).pack(fill="x", pady=scaled_pad(self, (6, 0)))
 
         self.time_label: customtkinter.CTkLabel = customtkinter.CTkLabel(
             self,
@@ -198,8 +199,8 @@ class PlayerWindow(customtkinter.CTkToplevel):
             button_corner_radius=0,
             progress_color=INK,
             fg_color=RULE,
-            button_color=ACCENT,
-            button_hover_color=ACCENT_DARK,
+            button_color=accent.mark(),
+            button_hover_color=accent.text(),
             command=self.change_playback_position,
         )
         self.progress_bar.set(0)
@@ -232,12 +233,13 @@ class PlayerWindow(customtkinter.CTkToplevel):
             button_corner_radius=0,
             progress_color=INK,
             fg_color=RULE,
-            button_color=ACCENT,
-            button_hover_color=ACCENT_DARK,
+            button_color=accent.mark(),
+            button_hover_color=accent.text(),
             command=self.change_volume,
         )
         self.volume_slider.set(0)
         self.volume_slider.pack(side="left", fill="x", expand=True)
+        accent.watch(self.recolor_sliders)
 
         self.controls_frame: customtkinter.CTkFrame = customtkinter.CTkFrame(
             self,
@@ -372,7 +374,12 @@ class PlayerWindow(customtkinter.CTkToplevel):
         self.app.close_player()
         return "break"
 
+    def recolor_sliders(self) -> None:
+        for slider in (self.progress_bar, self.volume_slider):
+            slider.configure(button_color=accent.mark(), button_hover_color=accent.text())
+
     def destroy(self) -> None:
+        accent.unwatch(self.recolor_sliders)
         cancel_pending_after(self)
         super().destroy()
 
@@ -397,6 +404,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
                     f"Theme: {self.app.theme_choice()}",
                     self.app.cycle_theme,
                 ),
+                MenuItem(f"Accent: {accent.name()}", self.app.cycle_accent),
                 MenuItem(f"{check}  Always on top", self.toggle_menu_always_on_top),
                 SIZE_ROW,
                 MenuItem("Refresh song", self.app.refresh_song),
@@ -407,7 +415,7 @@ class PlayerWindow(customtkinter.CTkToplevel):
                 ),
                 MenuItem(f"About {APP_NAME}", lambda: self.app.show_about(self)),
                 MenuItem("Close player", self.close_window),
-                MenuItem(f"Quit {APP_NAME}", self.app.quit_app, ACCENT_DARK),
+                MenuItem(f"Quit {APP_NAME}", self.app.quit_app, WARNING),
             ],
         )
 
