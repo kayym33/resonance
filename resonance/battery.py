@@ -13,6 +13,9 @@ from pathlib import Path
 
 POWER_SUPPLY_DIR = Path("/sys/class/power_supply")
 LOW_PERCENT = 20
+# The one-time warning: shown under the first, re-armed above the second.
+WARN_BELOW_PERCENT = 20
+REARM_ABOVE_PERCENT = 25
 
 
 @dataclass(frozen=True)
@@ -23,6 +26,41 @@ class Battery:
     @property
     def low(self) -> bool:
         return self.percent <= LOW_PERCENT and not self.charging
+
+
+class LowBatteryWatch:
+    """Decides when to warn that the battery is running low.
+
+    Warns once each time the charge drops under WARN_BELOW_PERCENT while
+    unplugged, then stays quiet until the laptop has been plugged in or
+    the charge has climbed back over REARM_ABOVE_PERCENT. The gap between
+    the two keeps it from repeating while the charge hovers around 20%.
+    """
+
+    def __init__(self) -> None:
+        self.armed: bool = True
+
+    def update(self, battery: Battery | None) -> bool:
+        """Take the latest reading; True means "show the warning now"."""
+        if battery is None or battery.charging:
+            self.armed = True
+            return False
+        if battery.percent > REARM_ABOVE_PERCENT:
+            self.armed = True
+            return False
+        if battery.percent < WARN_BELOW_PERCENT and self.armed:
+            self.armed = False
+            return True
+        return False
+
+    @staticmethod
+    def still_low(battery: Battery | None) -> bool:
+        """Whether a warning already on screen should stay there."""
+        return (
+            battery is not None
+            and not battery.charging
+            and battery.percent <= REARM_ABOVE_PERCENT
+        )
 
 
 def read_battery() -> Battery | None:

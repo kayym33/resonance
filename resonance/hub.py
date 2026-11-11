@@ -21,6 +21,7 @@ from .constants import (
     MONO_FONT,
     MUTED,
 )
+from .battery import Battery, LowBatteryWatch
 from .battery import describe as describe_battery
 from .battery import read_battery
 from .home_page import HomePage
@@ -32,6 +33,7 @@ from .starfield import Starfield
 from .windows import (
     add_rule,
     cancel_pending_after,
+    outline_width,
     prepare_window,
 )
 
@@ -122,10 +124,8 @@ class HubWindow(customtkinter.CTkToplevel):
         # Stars that thin out towards the content. The bottom field is
         # packed now so it keeps its place below the pages; the home page
         # fills its own spare space with more, growing denser downwards.
-        NoiseBand(self.content, NOISE_COLUMNS, (0.5, 0.22)).pack(
-            fill="x",
-            pady=(4, 0),
-        )
+        self.noise_band = NoiseBand(self.content, NOISE_COLUMNS, (0.5, 0.22))
+        self.noise_band.pack(fill="x", pady=(4, 0))
         Starfield(self.content, 0.22, 0.45, height=56).pack(
             side="bottom",
             fill="x",
@@ -221,6 +221,39 @@ class HubWindow(customtkinter.CTkToplevel):
         self.show_account()
 
         add_rule(self.content, INK, padx=MARGIN, pady=(6, 8))
+
+        # Shown only while the battery is low (see show_battery). The hub
+        # has no spare height, so it sits over the noise band instead of
+        # pushing the panels down. All CTk widgets, so it follows day and
+        # night by itself.
+        self.battery_watch = LowBatteryWatch()
+        self.battery_warning = customtkinter.CTkFrame(
+            self.content,
+            corner_radius=0,
+            fg_color=BACKGROUND,
+            border_color=ACCENT_DARK,
+            border_width=outline_width(self),
+        )
+        self.battery_warning_label = customtkinter.CTkLabel(
+            self.battery_warning,
+            text="",
+            font=mono(12, "bold"),
+            text_color=ACCENT_DARK,
+            height=22,
+        )
+        self.battery_warning_label.pack(side="left", padx=(12, 4), pady=2)
+        customtkinter.CTkButton(
+            self.battery_warning,
+            text="x",
+            width=26,
+            height=22,
+            corner_radius=0,
+            fg_color="transparent",
+            hover_color=HOVER,
+            text_color=MUTED,
+            font=mono(11),
+            command=self.hide_battery_warning,
+        ).pack(side="left", padx=(0, 2), pady=2)
 
         self.launcher: LauncherPanel = LauncherPanel(self.content, self.app)
         self.launcher.pack(fill="x", padx=MARGIN, pady=(0, 4))
@@ -507,9 +540,31 @@ class HubWindow(customtkinter.CTkToplevel):
     def refresh_outlines(self) -> None:
         self.call_pages("refresh_outlines")
         self.launcher.refresh_outlines()
+        self.battery_warning.configure(border_width=outline_width(self))
 
     def update_battery(self) -> None:
-        battery = read_battery()
+        self.show_battery(read_battery())
+        self.after(BATTERY_CHECK_MS, self.update_battery)
+
+    def show_battery(self, battery: Battery | None) -> None:
+        """Show a battery reading, or nothing on a computer without one."""
+        if self.battery_watch.update(battery):
+            # Wake the idle clock so the warning is seen.
+            self.note_activity()
+            self.battery_warning.place(
+                in_=self.noise_band,
+                relx=0.5,
+                rely=0.5,
+                anchor="center",
+            )
+            self.battery_warning.lift()
+        elif not self.battery_watch.still_low(battery):
+            # Plugged in or recharged; a dismissed warning stays away too.
+            self.hide_battery_warning()
+        if battery is not None:
+            self.battery_warning_label.configure(
+                text=f"! battery low ~ {battery.percent}% left, plug in soon",
+            )
         if battery is None:
             self.battery_label.pack_forget()
         else:
@@ -524,7 +579,9 @@ class HubWindow(customtkinter.CTkToplevel):
                     padx=(0, 18),
                     after=self.time_label,
                 )
-        self.after(BATTERY_CHECK_MS, self.update_battery)
+
+    def hide_battery_warning(self) -> None:
+        self.battery_warning.place_forget()
 
     def update_time(self) -> None:
         self.time_label.configure(text=get_time())
