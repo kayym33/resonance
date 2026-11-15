@@ -43,7 +43,7 @@ def describe_sync(status: str, message: str, last_synced: float | None) -> str:
     if status == "synced" and last_synced is not None:
         minutes = int((time.time() - last_synced) // 60)
         synced = "synced just now" if minutes < 1 else f"synced {minutes} min ago"
-        # Synced, but with a caveat (recipes waiting for the server).
+        # Synced, but with a caveat (newer kinds waiting for the server).
         return f"{synced}; {message}" if message else synced
     return message or "not synced yet"
 

@@ -116,7 +116,9 @@ class Suggestion:
     action named by ``args``), "page" (open the hub app named ``args``),
     "play" (Spotify search for ``args``), "todo" (add ``args`` as a task),
     "phone" (push ``args`` to the phone app), "accent" (switch to the
-    preset named ``args``) or "calc" (``args`` is the result).
+    preset named ``args``), "habits_done" (set the habits page's all-done
+    message to ``args``, or reset it if empty) or "calc" (``args`` is the
+    result).
     """
 
     title: str
@@ -304,6 +306,19 @@ def suggest(
             ]
         if word == "accent":
             return accent_suggestions(text, args)
+        if word == "habits":
+            first, _, message = args.partition(" ")
+            if first.lower() == "done":
+                message = message.strip()
+                return [
+                    Suggestion(
+                        f"habits done {message}".rstrip(),
+                        "set the all-done message" if message else "reset the all-done message",
+                        text,
+                        "habits_done",
+                        message,
+                    )
+                ]
         for command in commands:
             if word in command.names():
                 return argument_suggestions(command, word, args)

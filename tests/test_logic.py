@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from resonance import accent  # noqa: E402
 from resonance.battery import Battery, LowBatteryWatch  # noqa: E402
+from resonance import habits, sound  # noqa: E402
 from resonance.launcher import Command, suggest  # noqa: E402
 from resonance.store import Collection  # noqa: E402
 from resonance.usage import (  # noqa: E402
@@ -250,6 +251,82 @@ class AccentTests(unittest.TestCase):
         result = suggest("accent tr", COMMANDS)
         self.assertEqual([(item.kind, item.args) for item in result], [("accent", "trans")])
         self.assertEqual(suggest("accent zzz", COMMANDS)[0].kind, "none")
+
+
+
+class HabitTests(unittest.TestCase):
+    TODAY = datetime(2026, 11, 15).date()
+
+    def days_ago(self, *offsets: int) -> set:
+        return {self.TODAY - timedelta(days=offset) for offset in offsets}
+
+    def test_streak_counts_today(self) -> None:
+        self.assertEqual(habits.streak(self.days_ago(0, 1, 2), self.TODAY), 3)
+
+    def test_today_not_done_yet_keeps_streak(self) -> None:
+        self.assertEqual(habits.streak(self.days_ago(1, 2), self.TODAY), 2)
+
+    def test_missed_day_breaks_streak(self) -> None:
+        self.assertEqual(habits.streak(self.days_ago(0, 2, 3), self.TODAY), 1)
+        self.assertEqual(habits.streak(self.days_ago(2, 3), self.TODAY), 0)
+
+    def test_best_streak(self) -> None:
+        self.assertEqual(habits.best_streak(self.days_ago(0, 5, 6, 7, 9)), 3)
+        self.assertEqual(habits.best_streak(set()), 0)
+
+    def test_week_runs_monday_to_sunday(self) -> None:
+        # 2026-11-15 is a Sunday.
+        week = habits.week_days(self.TODAY)
+        self.assertEqual(len(week), 7)
+        self.assertEqual(week[0].weekday(), 0)
+        self.assertEqual(week[-1], self.TODAY)
+        self.assertEqual(habits.week_days(week[0]), week)
+
+    def test_toggle_saves_and_reloads(self) -> None:
+        habit = habits.add_habit("  stretch  ")
+        assert habit is not None
+        self.assertTrue(habits.toggle_day(habit, self.TODAY))
+        loaded = next(item for item in habits.load_habits() if item.id == habit.id)
+        self.assertEqual(loaded.name, "stretch")
+        self.assertEqual(loaded.done, {self.TODAY})
+        self.assertFalse(habits.toggle_day(loaded, self.TODAY))
+        habits.delete_habit(loaded)
+        self.assertNotIn(habit.id, [item.id for item in habits.load_habits()])
+
+    def test_blank_name_adds_nothing(self) -> None:
+        self.assertIsNone(habits.add_habit("   "))
+
+    def test_bad_dates_are_skipped(self) -> None:
+        self.assertEqual(habits.parse_days(["2026-11-15", "nope", 3]), {self.TODAY})
+
+
+class TickSoundTests(unittest.TestCase):
+    def test_two_snaps_within_range(self) -> None:
+        samples = sound.tick_samples()
+        self.assertLessEqual(max(abs(sample) for sample in samples), 1.0)
+        lead = int(sound.LEAD_IN * sound.RATE)
+        second = lead + int(sound.TICK.snaps[1].start * sound.RATE)
+        # Silent before and between the snaps, loud at each.
+        self.assertEqual(max(abs(sample) for sample in samples[:lead]), 0.0)
+        self.assertGreater(max(abs(sample) for sample in samples[lead:lead + 200]), 0.5)
+        self.assertGreater(max(abs(sample) for sample in samples[second:second + 200]), 0.2)
+        self.assertLess(max(abs(sample) for sample in samples[second - 200:second]), 0.05)
+
+    def test_generated_once_and_recording_wins(self) -> None:
+        path = sound.tick_path()
+        self.assertTrue(path.exists())
+        self.assertIn(str(sound.SYNTH_VERSION), path.name)
+        sound.CUSTOM_TICK_PATH.write_bytes(b"mine")
+        try:
+            self.assertEqual(sound.tick_path(), sound.CUSTOM_TICK_PATH)
+        finally:
+            sound.CUSTOM_TICK_PATH.unlink()
+
+    def test_launcher_sets_done_message(self) -> None:
+        result = suggest("habits done  well done :)", COMMANDS)
+        self.assertEqual([(item.kind, item.args) for item in result], [("habits_done", "well done :)")])
+        self.assertEqual(suggest("habits done", COMMANDS)[0].kind, "habits_done")
+        self.assertEqual(suggest("habits done", COMMANDS)[0].args, "")
 
 
 if __name__ == "__main__":
