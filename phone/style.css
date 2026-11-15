@@ -66,8 +66,8 @@ body {
   background: var(--background);
   color: var(--ink-soft);
   font: 15px/1.5 var(--mono);
-  /* Room for the tab bar and the home indicator. */
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  /* Room for the tab bar, which reaches down past the home indicator. */
+  padding-bottom: calc(52px + env(safe-area-inset-bottom) / 2);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
   /* Buttons and labels aren't text to select, and long-pressing a link
@@ -308,7 +308,6 @@ nav {
   display: flex;
   background: var(--background);
   border-top: 1px solid var(--ink);
-  padding-bottom: env(safe-area-inset-bottom);
 }
 nav[hidden] { display: none; }
 nav a {
@@ -316,7 +315,11 @@ nav a {
   text-align: center;
   text-decoration: none;
   color: var(--muted);
-  padding: 14px 0 12px;
+  /* The tabs reach the bottom of the screen, so the selected one is a
+     solid block down to the edge, as in iOS. Their text sits in the top
+     part, half the home indicator's space above it: clear of the
+     indicator without floating. */
+  padding: 14px 0 calc(12px + env(safe-area-inset-bottom) / 2);
   font-size: 14px;
 }
 nav a.on { color: var(--background); background: var(--ink); font-weight: 700; position: relative; }

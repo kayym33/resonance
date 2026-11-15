@@ -138,6 +138,12 @@ def load_commands() -> list[Command]:
 
     with COMMANDS_PATH.open(encoding="utf-8") as commands_file:
         data: object = json.load(commands_file)
+    return parse_commands(data)
+
+
+def parse_commands(data: object) -> list[Command]:
+    """Commands from the contents of a commands file; raises ValueError
+    if it isn't one."""
     if not isinstance(data, dict):
         raise ValueError(f"{COMMANDS_PATH} must contain a JSON object")
 
@@ -173,6 +179,30 @@ def read_commands_file() -> dict[str, Any] | None:
     except (OSError, ValueError):
         return None  # Missing, or mid-edit; try again next sync.
     return data if isinstance(data, dict) else None
+
+
+def describe_changes(old: dict[str, Any] | None, new: dict[str, Any]) -> list[str]:
+    """What replacing commands ``old`` with ``new`` would change, one line
+    per command, showing exactly what added or changed ones would run."""
+
+    def runs(entry: Any) -> list[str]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("run"), list):
+            return ["(not a valid command)"]
+        return [
+            "  runs: " + " ".join(str(arg) for arg in argv)
+            if isinstance(argv, list) else "  runs: (not a list)"
+            for argv in entry["run"]
+        ]
+
+    old = old or {}
+    lines: list[str] = []
+    for name, entry in new.items():
+        if name not in old:
+            lines += [f"+ {name} (new)", *runs(entry)]
+        elif entry != old[name]:
+            lines += [f"~ {name} (changed)", *runs(entry)]
+    lines += [f"- {name} (removed)" for name in old if name not in new]
+    return lines
 
 
 def write_synced_commands(data: dict[str, Any], updated_at: str) -> str | None:

@@ -36,6 +36,7 @@ from .backend import (
     toggle_playback,
 )
 from .cloud import CloudError
+from .commands_dialog import CommandsDialog
 from .constants import APP_NAME, APP_SIZES, APP_VERSION, DEFAULT_SIZE
 from .events import load_events
 from .hub import HubWindow
@@ -101,6 +102,10 @@ class ResonanceApp(customtkinter.CTk):
         self.context_menu: customtkinter.CTkToplevel | None = None
         self.update_check_enabled: bool = True
         self.account_dialog: AccountDialog | None = None
+        self.commands_dialog: CommandsDialog | None = None
+        # The synced commands already asked about this run (by date), so
+        # closing the dialog doesn't bring it back every sync.
+        self.commands_asked: str | None = None
         # Latest forecast from the hub's weather panel, for the briefing.
         self.weather: dict[str, Any] | None = None
         self.avatar_cache: tuple[object, ThemedImage, ThemedImage] | None = None
@@ -358,6 +363,26 @@ class ResonanceApp(customtkinter.CTk):
             self.hub.data_changed(kinds)
         if "profile" in kinds:
             self.profile_changed()
+
+    def offer_commands(self) -> None:
+        """Ask before using launcher commands synced from elsewhere."""
+        offered = self.sync.offered_commands
+        if offered is None or self.commands_dialog is not None:
+            return
+        if offered["updated_at"] == self.commands_asked:
+            return
+        parent = next(iter(self.windows()), None)
+        if parent is None:
+            return
+        self.commands_asked = offered["updated_at"]
+        self.commands_dialog = CommandsDialog(parent, offered, self.commands_answered)
+
+    def commands_answered(self, accepted: bool | None) -> None:
+        self.commands_dialog = None
+        if accepted:
+            self.sync.accept_commands()
+        elif accepted is False:
+            self.sync.decline_commands()
 
     def windows(self) -> list[HubWindow | PlayerWindow]:
         return [window for window in (self.hub, self.player) if window]

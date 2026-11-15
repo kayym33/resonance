@@ -18,6 +18,7 @@ from .cloud import AuthError, Cloud, CloudError, Session
 from .launcher import (
     PLATFORM,
     commands_modified_at,
+    parse_commands,
     read_commands_file,
     write_synced_commands,
 )
@@ -71,7 +72,10 @@ class SyncEngine:
         self.app = app
         self.cloud = cloud or Cloud()
         # user_id: whose data is on this device; cursor: newest server
-        # time seen; commands_pushed: commands.json date last uploaded.
+        # time seen; commands_pushed: commands.json date last uploaded;
+        # commands_offered: synced commands waiting for the user's approval
+        # ({data, updated_at}); commands_declined: the date of the last
+        # synced commands the user turned down.
         self.state: dict[str, Any] = load_state()
         self.busy: bool = False
         self.pending: bool = False
@@ -192,6 +196,8 @@ class SyncEngine:
             self.set_status("synced")
         if changed:
             self.app.data_changed(changed)
+        if self.offered_commands is not None:
+            self.app.offer_commands()
         if self.pending:
             self.pending = False
             self.sync_now()
@@ -210,8 +216,8 @@ class SyncEngine:
         touched: set[Collection] = set()
         for row in rows:
             if row["kind"] == "commands":
-                if row["id"] == PLATFORM and self.merge_commands(row):
-                    changed.add("commands")
+                if row["id"] == PLATFORM:
+                    self.merge_commands(row)
                 continue
             collection = collection_for(row["kind"])
             if collection is not None and collection.apply_remote(row):
@@ -238,18 +244,64 @@ class SyncEngine:
             "updated_at": modified_at,
         }
 
-    def merge_commands(self, row: dict[str, Any]) -> bool:
+    def merge_commands(self, row: dict[str, Any]) -> None:
+        """Launcher commands start programs, so ones from another device
+        are never written straight away: anyone signed in to the account
+        could have changed them. They wait in ``commands_offered`` until
+        the user approves them (``accept_commands``)."""
         modified_at = commands_modified_at()
         if row.get("deleted") or (
             modified_at is not None
             and parse_iso(modified_at) >= parse_iso(row["updated_at"])
         ):
-            return False
-        self.state["commands_pushed"] = write_synced_commands(
-            row["data"],
-            row["updated_at"],
-        )
-        return True
+            return
+        data = row["data"]
+        if data == read_commands_file():
+            # Nothing to approve; just take the other device's date.
+            self.state["commands_pushed"] = write_synced_commands(
+                data,
+                row["updated_at"],
+            )
+            return
+        if row["updated_at"] == self.state.get("commands_declined"):
+            return
+        try:
+            parse_commands(data)
+        except (ValueError, TypeError):
+            return  # Not a commands file; never offer it.
+        self.state["commands_offered"] = {
+            "data": data,
+            "updated_at": row["updated_at"],
+        }
+
+    @property
+    def offered_commands(self) -> dict[str, Any] | None:
+        """Synced commands waiting for approval: {data, updated_at}."""
+        offer = self.state.get("commands_offered")
+        return offer if isinstance(offer, dict) else None
+
+    def accept_commands(self) -> None:
+        offer = self.state.pop("commands_offered", None)
+        if offer is None:
+            return
+        modified_at = commands_modified_at()
+        if modified_at is None or parse_iso(modified_at) < parse_iso(offer["updated_at"]):
+            self.state["commands_pushed"] = write_synced_commands(
+                offer["data"],
+                offer["updated_at"],
+            )
+        # Otherwise they were edited here since, and the newer edit wins.
+        save_state(self.state)
+        self.app.data_changed({"commands"})
+
+    def decline_commands(self) -> None:
+        """Keep this device's commands. Offered again only if they change
+        again elsewhere."""
+        offer = self.state.pop("commands_offered", None)
+        if offer is None:
+            return
+        self.state["commands_declined"] = offer["updated_at"]
+        save_state(self.state)
 
     # Accounts
 

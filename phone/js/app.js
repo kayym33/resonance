@@ -359,6 +359,12 @@ setInterval(() => {
   if (document.visibilityState === "visible") sync.syncNow();
 }, SYNC_INTERVAL_MS);
 
+// No pinch zoom, like a native app. Safari in a tab ignores the viewport's
+// user-scalable=no, but it can't zoom if its own pinch events are cancelled.
+for (const type of ["gesturestart", "gesturechange"]) {
+  document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
+}
+
 // The app restores each page's scroll itself; the browser doing it too
 // makes the page jump.
 history.scrollRestoration = "manual";
