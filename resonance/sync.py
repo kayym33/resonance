@@ -24,6 +24,7 @@ from .launcher import (
 )
 from .paths import DATA_DIR
 from .events import EVENTS
+from .habits import HABITS
 from .recipes import RECIPES
 from .settings import SETTINGS
 from .store import Collection, parse_iso
@@ -34,11 +35,13 @@ if TYPE_CHECKING:
     from .app import ResonanceApp
 
 SYNC_STATE_PATH = DATA_DIR / "sync.json"
-SYNCED: tuple[Collection, ...] = (TASKS, EVENTS, SETTINGS, PROFILE, RECIPES)
+SYNCED: tuple[Collection, ...] = (TASKS, EVENTS, SETTINGS, PROFILE, RECIPES, HABITS)
 # Kinds newer than some servers' schema. They're uploaded on their own, so
 # a server that hasn't run the latest supabase/schema.sql rejects only
 # them (they stay dirty until it does) instead of the whole sync.
-NEWER_KINDS: frozenset[str] = frozenset({"recipe"})
+NEWER_KINDS: frozenset[str] = frozenset({"recipe", "habit"})
+# How the account dialog names newer kinds that are waiting.
+KIND_NAMES: dict[str, str] = {"recipe": "recipes", "habit": "habits"}
 SYNC_INTERVAL: int = 60
 # Wait this long after an edit, so a burst of edits syncs once.
 EDIT_DELAY_MS: int = 2000
@@ -190,7 +193,8 @@ class SyncEngine:
         if refused:
             self.set_status(
                 "synced",
-                "recipes wait for the server: run supabase/schema.sql",
+                f"{', '.join(KIND_NAMES.get(kind, kind) for kind in sorted(refused))} "
+                "wait for the server: run supabase/schema.sql",
             )
         else:
             self.set_status("synced")

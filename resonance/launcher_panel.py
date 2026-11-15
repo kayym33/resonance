@@ -26,6 +26,8 @@ from .launcher import (
     run_command,
     suggest,
 )
+from .habits import DONE_MESSAGE_SETTING
+from .settings import save_setting
 from .todo import add_task
 from .usage import load_usage, record_use
 from .windows import add_rule, cancel_pending_after, outline_width
@@ -296,6 +298,12 @@ class LauncherPanel(customtkinter.CTkFrame):
             self.app.hub.show_page("calendar" if suggestion.args == "cal" else "home")
         elif suggestion.args == "account" and self.app.hub is not None:
             self.app.open_account(self.app.hub)
+        elif suggestion.kind == "habits_done":
+            # Synced; the habits page listens for settings.
+            save_setting(DONE_MESSAGE_SETTING, suggestion.args or None)
+            self.show_status(
+                f"all-done message: {suggestion.args}" if suggestion.args else "all-done message reset"
+            )
         elif suggestion.kind == "accent":
             self.app.set_accent_choice(suggestion.args)
             self.show_status(f"accent: {suggestion.args}")
